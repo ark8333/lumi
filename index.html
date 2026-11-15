@@ -162,7 +162,7 @@ html.dark #toast{background:#f3e6ee;color:#17101a}
 
 <script>
 'use strict';
-const APP_V='2026.11.15-7';
+const APP_V='2026.11.15-9';
 /* ================= Datos ================= */
 const KEY='lumi_v1';
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
@@ -268,7 +268,8 @@ function isDone(r){
   return (S.checks[ymd()]||[]).includes(r.id)
 }
 function streak(){let n=0;const d=new Date();if(!(S.checks[ymd(d)]||[]).length)d.setDate(d.getDate()-1);while((S.checks[ymd(d)]||[]).length){n++;d.setDate(d.getDate()-1)}return n}
-function routineBtn(r){const ok=isDone(r);return `<button class="chk ${ok?'on':''}" data-act="toggleR" data-id="${r.id}"><span class="ic">${esc(r.icon)}</span><span class="tx">${esc(r.name)}${r.freq==='semanal'?'<small>Esta semana</small>':''}</span><span class="tick">${ok?'✓':''}</span></button>`}
+function routineBtn(r){const ok=isDone(r);const b=`<button class="chk ${ok?'on':''}" ${hasAI()?'style="flex:1;margin:0"':''} data-act="toggleR" data-id="${r.id}"><span class="ic">${esc(r.icon)}</span><span class="tx">${esc(r.name)}${r.freq==='semanal'?'<small>Esta semana</small>':''}</span><span class="tick">${ok?'✓':''}</span></button>`;
+  return hasAI()?`<div style="display:flex;gap:8px;align-items:stretch;margin-bottom:8px">${b}<button class="btn sm ghost" style="flex:none" data-act="rutHow" data-id="${r.id}">Cómo</button></div>`:b}
 /* ================= IA (OpenRouter) ================= */
 const hasAI=()=>!!S.settings.aiKey;
 let aiBusy=false,tipLoading=false;
@@ -339,6 +340,39 @@ function splitActs(t){let acts=[];const m=t.match(/<acciones>([\s\S]*?)<\/accion
 function speak(t){try{if(!S.settings.tts||!window.speechSynthesis)return;speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t.replace(/[*#_`>]/g,'').slice(0,600));u.lang='es-ES';
   const v=speechSynthesis.getVoices().filter(v=>/^es/i.test(v.lang));const f=v.find(v=>/female|mujer|helena|elvira|lucia|monica|paulina|laura/i.test(v.name))||v[0];if(f)u.voice=f;u.rate=1.02;speechSynthesis.speak(u)}catch(e){}}
 let retoAuto=false,planAuto=false;
+/* ---- Guías paso a paso ---- */
+function parseGuide(t){const m=(t||'').match(/\{[\s\S]*\}/);if(!m)return null;let j;try{j=JSON.parse(m[0])}catch(e){return null}
+  const pasos=(Array.isArray(j.pasos)?j.pasos:[]).slice(0,12).map(p=>({t:String(p.t||p.titulo||''),d:String(p.d||p.texto||''),seg:Math.max(0,Math.min(3600,parseInt(p.seg)||0))})).filter(p=>p.t||p.d);
+  if(!pasos.length)return null;
+  return {titulo:String(j.titulo||''),intro:String(j.intro||''),pasos,errores:(Array.isArray(j.errores)?j.errores:[]).slice(0,5).map(String),consejo:String(j.consejo||'')}}
+async function getGuide(kind,text,extra){
+  S.guides=S.guides||{};const key=kind+':'+text;if(S.guides[key])return S.guides[key];
+  const q=kind==='ex'
+    ?`Explica cómo se hace este ejercicio de entrenamiento para feminizar la silueta: "${text}"${extra?' ('+extra+')':''}. Paso a paso, para alguien que nunca lo ha hecho, en casa.`
+    :kind==='rut'?`Explica paso a paso cómo hacer esta rutina de cuidado/feminización: "${text}" (${extra||'diaria'}). En orden, con tiempos, productos concretos y alternativas baratas de supermercado o droguería.`
+    :kind==='voz'?`Explica paso a paso cómo hacer este ejercicio de voz para feminizarla: "${text}"${extra?' ('+extra+')':''}. Con ejemplos de sonidos o frases para practicar y cómo saber si lo estás haciendo bien.`
+    :`Explica paso a paso cómo hacer este reto de hoy: "${text}". Si es un entrenamiento o una rutina, cada paso es un ejercicio o acción concreta con su tiempo o repeticiones y cómo se hace. Si incluye productos, di cuáles y alternativas baratas.`;
+  const t=await ai([{role:'system',content:AI_SYS},{role:'user',content:aiCtx()+'\n\n'+q+`
+Responde SOLO con JSON válido, sin texto antes ni después:
+{"titulo":"título corto","intro":"una frase","pasos":[{"t":"nombre corto del paso o ejercicio","d":"cómo se hace en 1-3 frases claras (series, repeticiones, postura)","seg":0}],"errores":["error común a evitar"],"consejo":"un consejo final"}
+En "seg" pon los segundos si ese paso se hace por tiempo (por ejemplo 45 o 120); si no, 0. Entre 3 y 8 pasos.`}],2500,.6);
+  const g=parseGuide(t);if(!g)throw new Error('La IA no ha devuelto la guía, prueba otra vez');
+  const ks=Object.keys(S.guides);if(ks.length>40)delete S.guides[ks[0]];
+  S.guides[key]=g;save();return g}
+function guideHTML(g,kind){
+  return `<h3>${esc(g.titulo||'Cómo hacerlo')}</h3>${g.intro?`<p class="mute" style="margin-top:-4px">${esc(g.intro)}</p>`:''}
+  ${g.pasos.map((p,i)=>`<div class="card" style="padding:14px;margin-bottom:10px"><div class="row" style="align-items:flex-start;gap:12px"><div style="flex:none;width:30px;height:30px;border-radius:50%;background:var(--rose);color:#fff;display:grid;place-items:center;font-weight:700">${i+1}</div><div class="grow" style="flex:1"><b>${esc(p.t)}</b><div class="small" style="margin-top:3px">${esc(p.d)}</div>${p.seg?`<button class="btn sm ghost" style="margin-top:8px" data-act="gTimer" data-s="${p.seg}">▶ ${mmss(p.seg)}</button>`:''}</div></div></div>`).join('')}
+  ${g.errores.length?`<div class="card" style="padding:14px"><b>⚠️ Evita</b>${g.errores.map(e=>`<div class="small" style="margin-top:4px">• ${esc(e)}</div>`).join('')}</div>`:''}
+  ${g.consejo?`<p class="small mute">💡 ${esc(g.consejo)}</p>`:''}
+  <div class="actions">${kind==='reto'&&S.retoPick&&!S.retoPick.done?'<button class="btn" data-act="gRetoDone">✓ Reto hecho</button>':''}${kind==='rut'&&gCur&&gCur.id&&(()=>{const r=S.routines.find(x=>x.id===gCur.id);return r&&!isDone(r)})()?'<button class="btn" data-act="gRutDone">✓ Hecha</button>':''}<button class="btn soft" data-act="close">Cerrar</button></div>
+  <button class="btn sm soft block" style="margin-top:10px" data-act="gRedo" data-kind="${kind}">🔄 Explícamelo de otra forma</button>`}
+let gCur=null;
+async function openGuide(kind,text,extra,id){
+  if(!hasAI())return toast('Activa la IA en Ajustes para ver guías');
+  gCur={kind,text,extra,id};
+  sheet(`<h3>📖 ${esc(text)}</h3><div class="card" style="text-align:center;padding:26px"><div style="font:500 19px var(--serif)">✨ Valeria está preparando la guía…</div><p class="small mute">Tarda unos segundos.</p></div>`);
+  try{const g=await getGuide(kind,text,extra);if(gCur&&gCur.text===text&&!$('#sheet').classList.contains('hidden'))sheet(guideHTML(g,kind))}
+  catch(e){if(!$('#sheet').classList.contains('hidden'))sheet(`<h3>📖 ${esc(text)}</h3><p>⚠️ ${esc(e.message||'No se pudo conectar')}</p><div class="actions"><button class="btn soft" data-act="close">Cerrar</button><button class="btn" data-act="gRedo" data-kind="${kind}">Reintentar</button></div>`)}}
 async function autoReto(){const rp=S.retoPick;if(!hasAI()||retoAuto||!rp||rp.ai||rp.done||rp.date!==ymd())return;retoAuto=true;
   try{const hechos=S.retosLog.slice(-15).map(l=>l.text).join(' | ');
     const t=await ai([{role:'system',content:AI_SYS},{role:'user',content:aiCtx()+`\n\nInventa UN reto nuevo para hoy, adecuado a su etapa, concreto y que pueda hacer hoy a su ritmo. Distinto de estos: ${hechos||'(ninguno)'}. Máximo 20 palabras. Responde solo con el texto del reto, sin comillas.`}],120,1);
@@ -395,7 +429,7 @@ function vEntreno(){
   h+=`<div class="card"><h2>${esc(P.title)}${P.ai?' · ✨ IA':''}</h2><div class="row wrap">${hasAI()?'<button class="btn sm" data-act="planAI">✨ Nuevo plan con IA</button>':'<span class="small mute">Con la IA activada en Ajustes puedes pedir un plan a tu medida.</span>'}${S.plan?'<button class="btn sm soft" data-act="planReset">Plan básico</button>':''}</div>${P.note?`<p class="small mute" style="margin:10px 0 0">${esc(P.note)}</p>`:''}</div>`;
   h+=`<div class="chips">${P.days.map((d,i)=>`<button class="chip ${i===eday?'on':''}" data-act="eday" data-d="${i}">Día ${i+1}</button>`).join('')}</div>`;
   const n=D.ex.filter((e,i)=>done.includes(exKey(eday,i))).length;
-  h+=`<div class="card"><h2>${esc(D.name)} <span>${n}/${D.ex.length} hoy</span></h2>${D.ex.map((e,i)=>{const ok=done.includes(exKey(eday,i));return `<button class="chk ${ok?'on':''}" data-act="exDone" data-i="${i}"><span class="ic">🏋️</span><span class="tx">${esc(e.n)}<small>${esc(e.s)} × ${esc(e.r)}${e.t?' · '+esc(e.t):''}</small></span><span class="tick">${ok?'✓':''}</span></button>`}).join('')}</div>`;
+  h+=`<div class="card"><h2>${esc(D.name)} <span>${n}/${D.ex.length} hoy</span></h2>${D.ex.map((e,i)=>{const ok=done.includes(exKey(eday,i));return `<div style="display:flex;gap:8px;align-items:stretch;margin-bottom:8px"><button class="chk ${ok?'on':''}" style="flex:1;margin:0" data-act="exDone" data-i="${i}"><span class="ic">🏋️</span><span class="tx">${esc(e.n)}<small>${esc(e.s)} × ${esc(e.r)}${e.t?' · '+esc(e.t):''}</small></span><span class="tick">${ok?'✓':''}</span></button>${hasAI()?`<button class="btn sm ghost" style="flex:none" data-act="exHow" data-i="${i}">Cómo</button>`:''}</div>`}).join('')}</div>`;
   h+=`<p class="small mute" style="text-align:center">Calienta 5 minutos antes y para si algo te duele. Mejor 2–4 días por semana con descanso entre medias.</p>`;
   return h;
 }
@@ -454,7 +488,7 @@ function vHoy(){
   if(hasAI()){const tip=S.aiTip&&S.aiTip.date===t?S.aiTip.text:'';if(!tip)loadTip();
     h+=`<div class="card"><h2>💌 Para ti hoy <button class="btn sm ghost" data-act="go" data-v="ia">Preguntar</button></h2><div style="font:500 17px/1.4 var(--serif)">${tip?esc(tip):'<span class="mute">Pensando algo para ti…</span>'}</div></div>`}
   const rp=retoHoy();
-  if(rp){h+=`<div class="card reto"><h2>Reto del día ${rp.done?'· ✓ conseguido':''}${rp.ai?' · ✨ IA':''}</h2><p>${esc(rp.text)}</p><div class="row wrap">${rp.done?`<button class="btn" data-act="retoOtro">Otro reto</button>`:`<button class="btn w" data-act="retoDone">¡Hecho!</button><button class="btn" data-act="retoOtro">Cambiar</button>`}${hasAI()?`<button class="btn" data-act="retoAI">✨ Inventa uno</button>`:''}</div></div>`}
+  if(rp){h+=`<div class="card reto"><h2>Reto del día ${rp.done?'· ✓ conseguido':''}${rp.ai?' · ✨ IA':''}</h2><p>${esc(rp.text)}</p><div class="row wrap">${rp.done?`<button class="btn" data-act="retoOtro">Otro reto</button>`:`<button class="btn w" data-act="retoDone">¡Hecho!</button><button class="btn" data-act="retoOtro">Cambiar</button>`}${hasAI()?`<button class="btn" data-act="retoAI">✨ Inventa uno</button>`:''}</div>${hasAI()?`<button class="btn w block" style="margin-top:10px" data-act="retoHow">📖 Cómo hacerlo</button>`:''}</div>`}
   h+=`<div class="card"><h2>Rutinas <button class="btn sm ghost" data-act="go" data-v="rutinas">Editar</button></h2>${S.routines.length?S.routines.map(routineBtn).join(''):'<div class="empty">No tienes rutinas. Añádelas en Rutinas.</div>'}</div>`;
   if(secOn('salud')&&S.meds.length){const ml=S.medLog[t]||[];h+=`<div class="card"><h2>Medicación de hoy</h2>${S.meds.map(m=>{const ok=ml.includes(m.id);return `<button class="chk ${ok?'on':''}" data-act="toggleM" data-id="${m.id}"><span class="ic">💊</span><span class="tx">${esc(m.name)}<small>${esc(m.dose)}${m.time?' · '+esc(m.time):''}</small></span><span class="tick">${ok?'✓':''}</span></button>`}).join('')}</div>`}
   const next=S.appts.filter(a=>a.date>=t).sort((a,b)=>a.date<b.date?-1:1)[0];
@@ -514,7 +548,7 @@ function vVoz(){
   <p class="small mute" style="margin:10px 0 12px">La franja rosa (165–255 Hz) es el tono típico de voz femenina. El tono es solo una parte: la resonancia y la entonación cuentan igual o más.</p>
   <button class="btn block ${mic?'soft':''}" data-act="mic" id="micBtn">${mic?'■ Parar':'● Empezar a escuchar'}</button></div>`;
   h+=`<div class="card"><div class="stat"><div><b>${wk}</b><span>min esta semana</span></div><div><b>${S.voiceLog.length}</b><span>sesiones</span></div><div><b>${S.recs.length}</b><span>grabaciones</span></div></div></div>`;
-  h+=`<div class="card"><h2>Ejercicios <button class="btn sm ghost" data-act="editEx">＋</button></h2>${S.voiceEx.map(e=>`<div class="li"><div class="grow"><b>${esc(e.name)}</b><div class="mute small">${e.mins} min${e.tip?' · '+esc(e.tip):''}</div></div><button class="btn sm" data-act="startEx" data-id="${e.id}">▶</button><button class="x" data-act="editEx" data-id="${e.id}">✎</button></div>`).join('')||'<div class="empty">Sin ejercicios</div>'}</div>`;
+  h+=`<div class="card"><h2>Ejercicios <button class="btn sm ghost" data-act="editEx">＋</button></h2>${S.voiceEx.map(e=>`<div class="li"><div class="grow"><b>${esc(e.name)}</b><div class="mute small">${e.mins} min${e.tip?' · '+esc(e.tip):''}</div></div>${hasAI()?`<button class="btn sm ghost" data-act="vozHow" data-id="${e.id}">Cómo</button>`:''}<button class="btn sm" data-act="startEx" data-id="${e.id}">▶</button><button class="x" data-act="editEx" data-id="${e.id}">✎</button></div>`).join('')||'<div class="empty">Sin ejercicios</div>'}</div>`;
   h+=`<div class="card"><h2>Grabaciones</h2><button class="btn block ${rec?'danger':''}" data-act="rec">${rec?'<span class="recdot"></span>Grabando… toca para parar':'🎙️ Grabar mi voz'}</button>
   <p class="small mute" style="margin:10px 0 4px">Graba la misma frase cada semana para comparar tu evolución.</p>
   ${S.recs.map(r=>`<div class="li" style="flex-wrap:wrap"><div class="grow"><b>${fmt(r.date)}</b> <span class="mute small">${r.time||''}${r.dur?' · '+r.dur+'s':''}</span><audio controls preload="none" data-media="${r.media}"></audio></div><button class="x" data-act="delRec" data-id="${r.id}">✕</button></div>`).join('')}</div>`;
@@ -731,6 +765,17 @@ const ACT={
     catch(e){toast(e.message||'No se pudo conectar');el.disabled=false;el.textContent='Crear plan'}},
   install:async()=>{if(!installEv)return toast('Usa el menú ⋮ de Brave → Instalar app');installEv.prompt();try{await installEv.userChoice}catch(e){}installEv=null;render()},
   noInstall:()=>{S.settings.noInstall=true;save();render()},
+  retoHow:()=>{const rp=S.retoPick;if(rp)openGuide('reto',rp.text)},
+  exHow:el=>{const e=plan().days[eday].ex[+el.dataset.i];if(e)openGuide('ex',e.n,e.s+' × '+e.r)},
+  gRedo:()=>{if(!gCur)return;if(S.guides)delete S.guides[gCur.kind+':'+gCur.text];openGuide(gCur.kind,gCur.text,gCur.extra,gCur.id)},
+  gRutDone:()=>{const id=gCur&&gCur.id;closeSheet();const a=S.checks[ymd()]||(S.checks[ymd()]=[]);if(id&&!a.includes(id))a.push(id);save();render();toast('¡Hecha! ✓')},
+  rutHow:el=>{const r=S.routines.find(x=>x.id===el.dataset.id);if(r)openGuide('rut',r.name,r.freq,r.id)},
+  vozHow:el=>{const e=S.voiceEx.find(x=>x.id===el.dataset.id);if(e)openGuide('voz',e.name,e.mins+' min')},
+  gRetoDone:()=>{closeSheet();ACT.retoDone()},
+  gTimer:el=>{if(timer){clearInterval(timer);timer=null;document.querySelectorAll('[data-act=gTimer]').forEach(b=>b.textContent='▶ '+mmss(+b.dataset.s))}
+    const tot=+el.dataset.s,t0=Date.now();el.textContent='⏳ '+mmss(tot);
+    timer=setInterval(()=>{const r=Math.max(0,tot-Math.floor((Date.now()-t0)/1000));el.textContent=r?'⏳ '+mmss(r):'✓ ¡Hecho!';
+      if(!r){clearInterval(timer);timer=null;if(navigator.vibrate)navigator.vibrate([200,100,200]);speak('¡Tiempo!')}},250)},
   setTheme:el=>{S.settings.theme=el.dataset.t;save();render()},
   sugName:el=>{const box=document.getElementById(el.dataset.box);const pick=[...NAMES].sort(()=>Math.random()-.5).slice(0,8);
     box.innerHTML=pick.map(n=>`<button class="chip" data-act="useName" data-n="${n}" data-in="${el.dataset.in}">${n}</button>`).join('');el.textContent='🎲 Otros nombres'},
