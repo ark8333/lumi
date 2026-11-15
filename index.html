@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#fbf5f3">
 <meta name="referrer" content="no-referrer">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Notas">
 <title>Lumi</title>
 <style>
 :root{--bg:#fbf5f3;--card:#fff;--ink:#3b1e34;--mute:#937a8c;--rose:#c4577e;--rose-d:#a23f66;--rose-l:#f7e1e8;--lila:#8b6bbf;--lila-l:#ece4f6;--line:#f0e2e7;--serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;--sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
@@ -156,7 +162,7 @@ html.dark #toast{background:#f3e6ee;color:#17101a}
 
 <script>
 'use strict';
-const APP_V='2026.11.15-6';
+const APP_V='2026.11.15-7';
 /* ================= Datos ================= */
 const KEY='lumi_v1';
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
@@ -431,6 +437,7 @@ function vHoy(){
   const t=ymd(),n=S.settings.name;
   const tot=S.routines.length,dn=S.routines.filter(isDone).length,pct=tot?dn/tot:0,C=2*Math.PI*34,st=streak();
   let h=head(n?`Hola, ${esc(n)}`:'Hola ✿',fmtLong(new Date()));
+  if(installEv&&!isInstalled()&&!S.settings.noInstall)h+=`<div class="card" style="border-color:var(--rose)"><div class="row between"><div><b>📲 Instálala como app</b><div class="small mute">Icono propio y pantalla completa</div></div><div class="row" style="gap:6px"><button class="btn sm soft" data-act="noInstall">Luego</button><button class="btn sm" data-act="install">Instalar</button></div></div></div>`;
   if(!storageOK)h+=`<div class="warn">⚠️ Este navegador no deja guardar datos al abrir el archivo así. Lo que apuntes se perderá al cerrar. Usa <b>Exportar copia</b> en Ajustes o ábrelo de otra forma.</div>`;
   h+=`<div class="card"><div class="row" style="gap:18px">
     <svg width="86" height="86" viewBox="0 0 84 84"><defs><linearGradient id="g"><stop offset="0" stop-color="#c4577e"/><stop offset="1" stop-color="#8b6bbf"/></linearGradient></defs>
@@ -588,6 +595,7 @@ function vRetos(){
 function vAjustes(){
   let h=head('Ajustes','Privacidad y copias','mas');
   h+=`<div class="card"><h2>Tu nombre</h2><input id="setName" placeholder="¿Cómo quieres que te llame?" value="${esc(S.settings.name)}" data-chg="name">${nameUI('setName')}</div>`;
+  if(!isInstalled())h+=`<div class="card"><h2>Instalar como app</h2>${installEv?'<p class="small mute" style="margin:0 0 10px">Icono propio, pantalla completa y sin la barra del navegador.</p><button class="btn block" data-act="install">📲 Instalar app</button>':'<p class="small mute" style="margin:0">En Brave: menú ⋮ → <b>Instalar app</b> o <b>Añadir a pantalla de inicio</b>.</p>'}</div>`;
   const th=S.settings.theme||'dark';
   h+=`<div class="card"><h2>Apariencia</h2><div class="chips" style="margin:0">${[['light','☀️ Claro'],['dark','🌙 Oscuro'],['auto','📱 Automático']].map(o=>`<button class="chip ${th===o[0]?'on':''}" data-act="setTheme" data-t="${o[0]}">${o[1]}</button>`).join('')}</div></div>`;
   const st=STAGES[S.stage];
@@ -721,6 +729,8 @@ const ACT={
     S.planPrefs=pr;save();el.disabled=true;el.textContent='Creando…';
     try{await genPlan(pr);closeSheet();go('entreno');toast('¡Plan nuevo listo! 💪')}
     catch(e){toast(e.message||'No se pudo conectar');el.disabled=false;el.textContent='Crear plan'}},
+  install:async()=>{if(!installEv)return toast('Usa el menú ⋮ de Brave → Instalar app');installEv.prompt();try{await installEv.userChoice}catch(e){}installEv=null;render()},
+  noInstall:()=>{S.settings.noInstall=true;save();render()},
   setTheme:el=>{S.settings.theme=el.dataset.t;save();render()},
   sugName:el=>{const box=document.getElementById(el.dataset.box);const pick=[...NAMES].sort(()=>Math.random()-.5).slice(0,8);
     box.innerHTML=pick.map(n=>`<button class="chip" data-act="useName" data-n="${n}" data-in="${el.dataset.in}">${n}</button>`).join('');el.textContent='🎲 Otros nombres'},
@@ -858,6 +868,13 @@ function welcome(){sheet(`<h3>Bienvenida 🌸</h3><p class="mute" style="margin-
   <label class="f">¿En qué punto estás?</label>${stageOpts('obStage')}
   <label class="f">¿Qué quieres usar?</label>${SECS.map(s=>`<div class="li"><span style="font-size:20px">${s[1]}</span><div class="grow">${s[2]}</div><button class="sw ${secOn(s[0])?'on':''}" data-act="togSec" data-k="${s[0]}"></button></div>`).join('')}
   <button class="btn block" style="margin-top:16px" data-act="startApp">Empezar</button>`)}
+
+/* ================= App instalable (PWA) ================= */
+let installEv=null;
+const isInstalled=()=>matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+if('serviceWorker' in navigator&&/^https?:/.test(location.protocol))window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installEv=e;if(view==='ajustes'||view==='hoy')render()});
+window.addEventListener('appinstalled',()=>{installEv=null;toast('¡App instalada! 🎉');render()});
 
 /* ================= Auto-actualización ================= */
 let updChecking=false;
