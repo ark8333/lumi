@@ -156,6 +156,7 @@ html.dark #toast{background:#f3e6ee;color:#17101a}
 
 <script>
 'use strict';
+const APP_V='2026.11.15-6';
 /* ================= Datos ================= */
 const KEY='lumi_v1';
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
@@ -604,6 +605,7 @@ function vAjustes(){
   <p class="small mute" style="margin:12px 0 0">Todo se guarda solo en este navegador, en este dispositivo. No se envía nada a ningún sitio y funciona sin internet. El PIN es una cortina para miradas curiosas, no un cifrado.</p></div>`;
   h+=`<div class="card"><h2>Copias de seguridad</h2><p class="small mute" style="margin:0 0 12px">Si borras los datos del navegador (o tienes activado en Brave "borrar datos al salir"), se pierde todo. Haz una copia de vez en cuando y guárdala donde quieras.</p>
   <div class="row"><button class="btn block" data-act="export">⬇ Exportar copia</button><button class="btn ghost block" data-act="import">⬆ Importar</button></div></div>`;
+  h+=`<p class="small mute" style="text-align:center">Lumi · versión ${APP_V} · se actualiza sola</p>`;
   h+=`<div class="card"><h2>Zona peligrosa</h2><button class="btn danger block" data-act="wipe">Borrar todos los datos</button></div>`;
   return h;
 }
@@ -856,6 +858,26 @@ function welcome(){sheet(`<h3>Bienvenida 🌸</h3><p class="mute" style="margin-
   <label class="f">¿En qué punto estás?</label>${stageOpts('obStage')}
   <label class="f">¿Qué quieres usar?</label>${SECS.map(s=>`<div class="li"><span style="font-size:20px">${s[1]}</span><div class="grow">${s[2]}</div><button class="sw ${secOn(s[0])?'on':''}" data-act="togSec" data-k="${s[0]}"></button></div>`).join('')}
   <button class="btn block" style="margin-top:16px" data-act="startApp">Empezar</button>`)}
+
+/* ================= Auto-actualización ================= */
+let updChecking=false;
+const appBusy=()=>!$('#sheet').classList.contains('hidden')||aiBusy||!!rec||!!mic||!!timer||(document.activeElement&&/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName));
+async function checkUpdate(){
+  if(!/^https?:/.test(location.protocol)||updChecking||document.hidden)return;updChecking=true;
+  try{const r=await fetch(location.pathname+'?v='+Date.now(),{cache:'no-store'});const t=await r.text();const m=t.match(/const APP_V='([^']+)'/);
+    if(m&&m[1]!==APP_V){
+      let tries={};try{tries=JSON.parse(sessionStorage.getItem('lumi_upd')||'{}')}catch(e){}
+      if((tries[m[1]]||0)>=2){updChecking=false;return}
+      if(appBusy()){updChecking=false;setTimeout(checkUpdate,20000);return}
+      tries[m[1]]=(tries[m[1]]||0)+1;try{sessionStorage.setItem('lumi_upd',JSON.stringify(tries))}catch(e){}
+      toast('✨ Nueva versión, actualizando…');
+      try{await fetch(location.href,{cache:'reload'})}catch(e){}
+      setTimeout(()=>location.reload(),900);return}
+  }catch(e){}
+  updChecking=false}
+setTimeout(checkUpdate,3000);
+setInterval(checkUpdate,30*60*1000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(checkUpdate,1500)});
 
 /* ================= Arranque ================= */
 render();
