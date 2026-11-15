@@ -162,8 +162,8 @@ html.dark #toast{background:#f3e6ee;color:#17101a}
 
 <script>
 'use strict';
-const APP_V='1.10';
-const APP_NEWS='Ahora ves la versión en Ajustes y te aviso cuando me actualizo';
+const APP_V='1.11';
+const APP_NEWS='La IA escribe en directo: las guías y el chat aparecen mientras se escriben, y la guía del reto se prepara sola';
 /* ================= Datos ================= */
 const KEY='lumi_v1';
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
@@ -285,6 +285,25 @@ async function ai(messages,max=500,temp=.9,retry=1){
   if(!t&&retry>0)return ai(messages,max,temp,retry-1);
   return t;
 }
+function aiErr(st,j){return st===401?'La clave no es válida':st===429?'Límite de uso alcanzado, prueba más tarde':((j&&j.error&&j.error.message)||'Error '+st)}
+async function aiStream(messages,onDelta,max=1500,temp=.7){
+  const ctl=new AbortController(),to=setTimeout(()=>ctl.abort(),90000);
+  try{
+    const r=await fetch('https://openrouter.ai/api/v1/chat/completions',{method:'POST',signal:ctl.signal,
+      headers:{'Authorization':'Bearer '+S.settings.aiKey,'Content-Type':'application/json','X-Title':'Lumi'},
+      body:JSON.stringify({model:S.settings.aiModel||'openrouter/free',messages,max_tokens:Math.max(max,1500),temperature:temp,stream:true})});
+    if(!r.ok){const j=await r.json().catch(()=>({}));throw new Error(aiErr(r.status,j))}
+    if(!r.body||!r.body.getReader){const j=await r.json().catch(()=>({}));const t=((((j.choices||[])[0]||{}).message||{}).content||'');onDelta&&onDelta(t);return t.replace(/<think>[\s\S]*?<\/think>/g,'').trim()}
+    const rd=r.body.getReader(),dec=new TextDecoder();let buf='',full='';
+    for(;;){const {done,value}=await rd.read();if(done)break;buf+=dec.decode(value,{stream:true});let i;
+      while((i=buf.indexOf('\n'))>=0){const line=buf.slice(0,i).trim();buf=buf.slice(i+1);
+        if(!line.startsWith('data:'))continue;const d=line.slice(5).trim();if(!d||d==='[DONE]')continue;
+        let j;try{j=JSON.parse(d)}catch(e){continue}
+        if(j.error)throw new Error(j.error.message||'Error de la IA');
+        const c=(((j.choices||[])[0]||{}).delta||{}).content;if(c){full+=c;onDelta&&onDelta(full)}}}
+    return full.replace(/<think>[\s\S]*?<\/think>/g,'').trim();
+  }catch(e){if(e.name==='AbortError')throw new Error('La IA está tardando demasiado, prueba otra vez');throw e}
+  finally{clearTimeout(to)}}
 function aiCtx(){
   const st=STAGES[S.stage],last=[...S.journal].sort((a,b)=>a.date<b.date?1:-1)[0];
   return `Datos de la usuaria: se llama ${S.settings.name||'(sin nombre todavía)'}. Etapa ${S.stage||1} de 4: ${st?st.n+' ('+st.d+')':'Descubrir'}. `+
@@ -346,39 +365,55 @@ function parseGuide(t){const m=(t||'').match(/\{[\s\S]*\}/);if(!m)return null;le
   const pasos=(Array.isArray(j.pasos)?j.pasos:[]).slice(0,12).map(p=>({t:String(p.t||p.titulo||''),d:String(p.d||p.texto||''),seg:Math.max(0,Math.min(3600,parseInt(p.seg)||0))})).filter(p=>p.t||p.d);
   if(!pasos.length)return null;
   return {titulo:String(j.titulo||''),intro:String(j.intro||''),pasos,errores:(Array.isArray(j.errores)?j.errores:[]).slice(0,5).map(String),consejo:String(j.consejo||'')}}
-async function getGuide(kind,text,extra){
+function parseGuideText(t){t=(t||'').replace(/<think>[\s\S]*?(<\/think>|$)/g,'');const g={titulo:'',intro:'',pasos:[],errores:[],consejo:''};
+  for(let l of t.split('\n')){l=l.trim();if(!l)continue;let m;
+    if(m=l.match(/^#+\s*(.+)/))g.titulo=m[1].replace(/\*/g,'');
+    else if(m=l.match(/^>\s*(.+)/))g.intro=m[1].replace(/\*/g,'');
+    else if(m=l.match(/^\**(\d+)[.)]\**\s*(.+)/)){const p=m[2].split('|').map(x=>x.trim().replace(/\*\*/g,''));g.pasos.push({t:p[0]||'',d:p[1]||'',seg:Math.max(0,Math.min(3600,parseInt(p[2])||0))})}
+    else if(m=l.match(/^(!|⚠️)\s*(.+)/))g.errores.push(m[2]);
+    else if(m=l.match(/^(💡|\*)\s*(.+)/))g.consejo=m[2].replace(/\*/g,'')}
+  return g}
+async function getGuide(kind,text,extra,onPartial){
   S.guides=S.guides||{};const key=kind+':'+text;if(S.guides[key])return S.guides[key];
   const q=kind==='ex'
     ?`Explica cómo se hace este ejercicio de entrenamiento para feminizar la silueta: "${text}"${extra?' ('+extra+')':''}. Paso a paso, para alguien que nunca lo ha hecho, en casa.`
     :kind==='rut'?`Explica paso a paso cómo hacer esta rutina de cuidado/feminización: "${text}" (${extra||'diaria'}). En orden, con tiempos, productos concretos y alternativas baratas de supermercado o droguería.`
     :kind==='voz'?`Explica paso a paso cómo hacer este ejercicio de voz para feminizarla: "${text}"${extra?' ('+extra+')':''}. Con ejemplos de sonidos o frases para practicar y cómo saber si lo estás haciendo bien.`
     :`Explica paso a paso cómo hacer este reto de hoy: "${text}". Si es un entrenamiento o una rutina, cada paso es un ejercicio o acción concreta con su tiempo o repeticiones y cómo se hace. Si incluye productos, di cuáles y alternativas baratas.`;
-  const t=await ai([{role:'system',content:AI_SYS},{role:'user',content:aiCtx()+'\n\n'+q+`
-Responde SOLO con JSON válido, sin texto antes ni después:
-{"titulo":"título corto","intro":"una frase","pasos":[{"t":"nombre corto del paso o ejercicio","d":"cómo se hace en 1-3 frases claras (series, repeticiones, postura)","seg":0}],"errores":["error común a evitar"],"consejo":"un consejo final"}
-En "seg" pon los segundos si ese paso se hace por tiempo (por ejemplo 45 o 120); si no, 0. Entre 3 y 8 pasos.`}],2500,.6);
-  const g=parseGuide(t);if(!g)throw new Error('La IA no ha devuelto la guía, prueba otra vez');
+  const t=await aiStream([{role:'system',content:AI_SYS},{role:'user',content:aiCtx()+'\n\n'+q+`
+Responde SOLO con este formato, una cosa por línea, sin nada más:
+# título corto
+> una frase de introducción
+1. nombre del paso | cómo se hace en 1-3 frases claras (series, repeticiones, postura) | segundos si ese paso va por tiempo, si no 0
+2. ...
+! un error común a evitar
+💡 un consejo final
+Entre 3 y 8 pasos. No uses el carácter | dentro de las frases.`}],onPartial,1800,.6);
+  let g=parseGuideText(t);if(!g.pasos.length)g=parseGuide(t);
+  if(!g||!g.pasos.length)throw new Error('La IA no ha devuelto la guía, prueba otra vez');
   const ks=Object.keys(S.guides);if(ks.length>40)delete S.guides[ks[0]];
   S.guides[key]=g;save();return g}
-function guideHTML(g,kind){
+function guideHTML(g,kind,partial){
   return `<h3>${esc(g.titulo||'Cómo hacerlo')}</h3>${g.intro?`<p class="mute" style="margin-top:-4px">${esc(g.intro)}</p>`:''}
   ${g.pasos.map((p,i)=>`<div class="card" style="padding:14px;margin-bottom:10px"><div class="row" style="align-items:flex-start;gap:12px"><div style="flex:none;width:30px;height:30px;border-radius:50%;background:var(--rose);color:#fff;display:grid;place-items:center;font-weight:700">${i+1}</div><div class="grow" style="flex:1"><b>${esc(p.t)}</b><div class="small" style="margin-top:3px">${esc(p.d)}</div>${p.seg?`<button class="btn sm ghost" style="margin-top:8px" data-act="gTimer" data-s="${p.seg}">▶ ${mmss(p.seg)}</button>`:''}</div></div></div>`).join('')}
   ${g.errores.length?`<div class="card" style="padding:14px"><b>⚠️ Evita</b>${g.errores.map(e=>`<div class="small" style="margin-top:4px">• ${esc(e)}</div>`).join('')}</div>`:''}
   ${g.consejo?`<p class="small mute">💡 ${esc(g.consejo)}</p>`:''}
-  <div class="actions">${kind==='reto'&&S.retoPick&&!S.retoPick.done?'<button class="btn" data-act="gRetoDone">✓ Reto hecho</button>':''}${kind==='rut'&&gCur&&gCur.id&&(()=>{const r=S.routines.find(x=>x.id===gCur.id);return r&&!isDone(r)})()?'<button class="btn" data-act="gRutDone">✓ Hecha</button>':''}<button class="btn soft" data-act="close">Cerrar</button></div>
-  <button class="btn sm soft block" style="margin-top:10px" data-act="gRedo" data-kind="${kind}">🔄 Explícamelo de otra forma</button>`}
+  ${partial?'<p class="mute" style="text-align:center">✍️ Valeria sigue escribiendo…</p>':`<div class="actions">${kind==='reto'&&S.retoPick&&!S.retoPick.done?'<button class="btn" data-act="gRetoDone">✓ Reto hecho</button>':''}${kind==='rut'&&gCur&&gCur.id&&(()=>{const r=S.routines.find(x=>x.id===gCur.id);return r&&!isDone(r)})()?'<button class="btn" data-act="gRutDone">✓ Hecha</button>':''}<button class="btn soft" data-act="close">Cerrar</button></div>
+  <button class="btn sm soft block" style="margin-top:10px" data-act="gRedo" data-kind="${kind}">🔄 Explícamelo de otra forma</button>`}`}
 let gCur=null;
 async function openGuide(kind,text,extra,id){
   if(!hasAI())return toast('Activa la IA en Ajustes para ver guías');
   gCur={kind,text,extra,id};
   sheet(`<h3>📖 ${esc(text)}</h3><div class="card" style="text-align:center;padding:26px"><div style="font:500 19px var(--serif)">✨ Valeria está preparando la guía…</div><p class="small mute">Tarda unos segundos.</p></div>`);
-  try{const g=await getGuide(kind,text,extra);if(gCur&&gCur.text===text&&!$('#sheet').classList.contains('hidden'))sheet(guideHTML(g,kind))}
+  const live=()=>gCur&&gCur.text===text&&!$('#sheet').classList.contains('hidden');
+  try{const g=await getGuide(kind,text,extra,part=>{const pg=parseGuideText(part);if(live()&&pg.pasos.length&&!timer)$('#sheetCard').innerHTML=guideHTML(pg,kind,true)});
+    if(live())$('#sheetCard').innerHTML=guideHTML(g,kind)}
   catch(e){if(!$('#sheet').classList.contains('hidden'))sheet(`<h3>📖 ${esc(text)}</h3><p>⚠️ ${esc(e.message||'No se pudo conectar')}</p><div class="actions"><button class="btn soft" data-act="close">Cerrar</button><button class="btn" data-act="gRedo" data-kind="${kind}">Reintentar</button></div>`)}}
 async function autoReto(){const rp=S.retoPick;if(!hasAI()||retoAuto||!rp||rp.ai||rp.done||rp.date!==ymd())return;retoAuto=true;
   try{const hechos=S.retosLog.slice(-15).map(l=>l.text).join(' | ');
     const t=await ai([{role:'system',content:AI_SYS},{role:'user',content:aiCtx()+`\n\nInventa UN reto nuevo para hoy, adecuado a su etapa, concreto y que pueda hacer hoy a su ritmo. Distinto de estos: ${hechos||'(ninguno)'}. Máximo 20 palabras. Responde solo con el texto del reto, sin comillas.`}],120,1);
     const txt=(t.split('\n').map(x=>x.trim()).filter(Boolean)[0]||'').replace(/^["“'*\-\s]+|["”'*\s]+$/g,'');
-    if(txt&&S.retoPick===rp&&!rp.done){S.retoPick={...rp,text:txt,ai:true};save();if(view==='hoy')render()}}catch(e){}
+    if(txt&&S.retoPick===rp&&!rp.done){S.retoPick={...rp,text:txt,ai:true};save();if(view==='hoy')render();getGuide('reto',txt).catch(()=>{})}}catch(e){}
   retoAuto=false}
 const AI_SYS='Eres Valeria, asistente experta en feminización, imagen y cuidado personal: tallas, ropa y estilo según el cuerpo, maquillaje, cuidado de piel, depilación, voz, postura, pelo y pelucas. Hablas en español de España, cercana, clara y práctica, con explicaciones paso a paso y productos concretos con alternativas baratas. Nunca juzgas. Usas siempre el femenino con la usuaria. Adaptas los consejos a su etapa y nunca la empujas a algo de una etapa a la que no ha llegado. Sobre hormonas o tratamientos médicos das solo información general y nunca dosis: remites siempre a un endocrino o a la unidad de identidad de género. Respuestas breves salvo que pida detalle.';
 async function loadTip(){
@@ -612,7 +647,7 @@ function vIA(){
   if(!hasAI())return h+`<div class="card"><p style="margin-top:0">Para usar a Valeria necesitas poner tu clave de OpenRouter.</p><button class="btn block" data-act="go" data-v="ajustes">Ir a Ajustes</button></div>`;
   const ms=S.aiChat||[];
   h+=`<div class="row" style="justify-content:flex-end;margin:-8px 0 10px"><button class="btn sm ${S.settings.tts?'':'soft'}" data-act="tts">${S.settings.tts?'🔊 Voz activada':'🔇 Voz apagada'}</button></div>`;
-  h+=`<div class="card">${ms.length?ms.map(m=>`<div class="msg ${m.role==='user'?'u':'a'}">${esc(m.content)}${m.acts&&m.acts.length?`<div style="margin-top:8px">${m.acts.map(x=>`<span class="tag l" style="margin:2px 4px 0 0">✓ ${esc(x)}</span>`).join('')}</div>`:''}</div>`).join(''):`<div class="msg a">¡Hola${S.settings.name?', '+esc(S.settings.name):''}! 💕 Soy Valeria. Pregúntame lo que quieras o pídeme cosas: apunto tus medidas, te creo rutinas, cambio tu reto, te hago un plan de entreno… Yo me encargo.</div>`}${aiBusy?'<div class="msg a t">Pensando…</div>':''}</div>
+  h+=`<div class="card">${ms.length?ms.map(m=>`<div class="msg ${m.role==='user'?'u':'a'}">${esc(m.content)}${m.acts&&m.acts.length?`<div style="margin-top:8px">${m.acts.map(x=>`<span class="tag l" style="margin:2px 4px 0 0">✓ ${esc(x)}</span>`).join('')}</div>`:''}</div>`).join(''):`<div class="msg a">¡Hola${S.settings.name?', '+esc(S.settings.name):''}! 💕 Soy Valeria. Pregúntame lo que quieras o pídeme cosas: apunto tus medidas, te creo rutinas, cambio tu reto, te hago un plan de entreno… Yo me encargo.</div>`}${aiBusy?'<div class="msg a t" id="streamMsg">Pensando…</div>':''}</div>
   ${aiBusy?'':`<div class="chips">${QUICK.map(q=>`<button class="chip" data-act="aiQuick" data-q="${esc(q)}">${esc(q)}</button>`).join('')}</div>`}
   <div class="row" style="align-items:flex-end"><textarea id="aiIn" style="min-height:52px;height:52px" placeholder="Pídeme lo que quieras…"></textarea><button class="btn" data-act="aiSend" ${aiBusy?'disabled':''}>➤</button></div>
   ${ms.length?'<button class="btn sm soft" style="margin-top:12px" data-act="aiClear">Borrar conversación</button>':''}`;
@@ -732,10 +767,12 @@ const ACT={
     try{const hechos=S.retosLog.slice(-15).map(l=>l.text).join(' | ');
       const t=await ai([{role:'system',content:AI_SYS},{role:'user',content:aiCtx()+`\n\nInventa UN reto nuevo para hoy, adecuado a su etapa, concreto y que se pueda hacer hoy en casa o a su ritmo. Distinto de estos: ${hechos||'(ninguno)'}. Máximo 20 palabras. Responde solo con el texto del reto, sin comillas ni explicaciones.`}],120,1);
       const txt=t.split('\n').map(x=>x.trim()).filter(Boolean)[0]||'';if(!txt)throw new Error('La IA no ha respondido, prueba otra vez');
-      S.retoPick={date:ymd(),text:txt.replace(/^["“'*\-\s]+|["”'*\s]+$/g,''),done:false,stage:S.stage,ai:true};save();render()}
+      S.retoPick={date:ymd(),text:txt.replace(/^["“'*\-\s]+|["”'*\s]+$/g,''),done:false,stage:S.stage,ai:true};save();render();getGuide('reto',S.retoPick.text).catch(()=>{})}
     catch(e){toast(e.message||'No se pudo conectar');render()}},
   aiSend:async(el,ev,preset)=>{const q=preset||fv('aiIn');if(!q||aiBusy)return;S.aiChat=S.aiChat||[];S.aiChat.push({role:'user',content:q});aiBusy=true;save();render();
-    try{const raw=await ai([{role:'system',content:AI_SYS+'\n\n'+ACT_SYS+'\n\n'+aiCtx()},...S.aiChat.slice(-20).map(m=>({role:m.role,content:m.content}))],1500,.7);
+    try{const raw=await aiStream([{role:'system',content:AI_SYS+'\n\n'+ACT_SYS+'\n\n'+aiCtx()},...S.aiChat.slice(-20).map(m=>({role:m.role,content:m.content}))],full=>{
+        const el=$('#streamMsg');if(!el)return;const v=full.replace(/<acciones>[\s\S]*$/i,'').replace(/<think>[\s\S]*?(<\/think>|$)/g,'').trim();
+        if(v){el.textContent=v;el.classList.remove('t');window.scrollTo(0,document.body.scrollHeight)}},1500,.7);
       const {text,acts}=splitActs(raw||'');const done=runActs(acts);
       S.aiChat.push({role:'assistant',content:text||(done.length?'¡Hecho!':'(sin respuesta, prueba otra vez)'),acts:done});speak(text)}
     catch(e){S.aiChat.push({role:'assistant',content:'⚠️ '+(e.message||'No se pudo conectar')})}
