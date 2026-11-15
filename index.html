@@ -175,8 +175,8 @@ html.dark #toast{background:#f3e6ee;color:#17101a}
 
 <script>
 'use strict';
-const APP_V='1.20';
-const APP_NEWS='Sincronización cifrada entre móvil y ordenador con tu cuenta anónima de GitHub';
+const APP_V='1.21';
+const APP_NEWS='Sincronización más segura: siempre junta los datos, guarda copia previa y puedes deshacer';
 /* ================= Datos ================= */
 const KEY='lumi_v1';
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
@@ -857,7 +857,9 @@ function vAjustes(){
   {const c=syncCfg(),on=syncOn();
   h+=`<div class="card"><h2>🔄 Sincronizar móvil y ordenador</h2>${on?`
     <div class="li"><div class="grow"><b>${syncing?'Sincronizando…':c.lastSync?'Última vez: '+new Date(c.lastSync).toLocaleString('es-ES',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'Activada'}</b>${syncMsg&&!syncing?`<div class="small" style="color:var(--rose-d)">${esc(syncMsg)}</div>`:''}<div class="small mute">Cifrado con tu contraseña. Se sincroniza sola al abrir y tras cada cambio.</div></div></div>
-    <div class="row" style="margin-top:10px"><button class="btn block" data-act="syncNow">Sincronizar ahora</button><button class="btn soft" data-act="syncOff">Desactivar</button></div>`:`
+    <div class="small mute" style="margin-top:8px">En este dispositivo: ${S.intimate.length} tareas íntimas · ${S.routines.length} rutinas · ${S.measures.length} medidas · ${S.journal.length} entradas · ${S.retosLog.length} retos hechos</div>
+    <div class="row" style="margin-top:10px"><button class="btn block" data-act="syncNow">Sincronizar ahora</button><button class="btn soft" data-act="syncOff">Desactivar</button></div>
+    ${(()=>{try{const p=JSON.parse(localStorage.getItem('lumi_prev')||'null');return p?`<button class="btn sm soft block" style="margin-top:8px" data-act="syncUndo">↩️ Deshacer última sincronización (${new Date(p.at).toLocaleString('es-ES',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})})</button>`:''}catch(e){return ''}})()}`:`
     <p class="small mute" style="margin:0 0 6px">Tus datos se guardan <b>cifrados</b> en un archivo secreto de tu cuenta anónima de GitHub. Nadie puede leerlos sin tu contraseña. Las fotos y audios se quedan en cada dispositivo.</p>
     <details style="margin:6px 0 4px"><summary class="small" style="cursor:pointer;color:var(--rose-d);font-weight:600">Cómo conseguir la llave de GitHub</summary><ol class="small" style="padding-left:18px;margin:8px 0;line-height:1.6">
     <li>En GitHub, con tu cuenta anónima: foto → <b>Settings</b> → <b>Developer settings</b>.</li>
@@ -1034,6 +1036,9 @@ const ACT={
     try{await gh('GET','/gists?per_page=1',null,t);setSyncCfg({token:t,pass:p});syncMsg='';toast('Llave correcta ✓');await syncNow(true)}
     catch(e){toast('⚠️ '+e.message);el.disabled=false;el.textContent='Activar sincronización'}render()},
   syncNow:()=>syncNow(true),
+  syncUndo:()=>{let p=null;try{p=JSON.parse(localStorage.getItem('lumi_prev')||'null')}catch(e){}if(!p)return;
+    if(!confirm('¿Volver a como estaba este dispositivo antes de la última sincronización?'))return;
+    S=Object.assign(JSON.parse(JSON.stringify(DEF)),p.state);lastJSON='';save();localStorage.removeItem('lumi_prev');render();toast('Restaurado ✓')},
   syncOff:()=>{if(!confirm('¿Desactivar la sincronización en este dispositivo? Tus datos de aquí no se borran.'))return;localStorage.removeItem(SYNC_KEY);syncMsg='';render()},
   setTheme:el=>{S.settings.theme=el.dataset.t;save();render()},
   sugName:el=>{const box=document.getElementById(el.dataset.box);const pick=[...NAMES].sort(()=>Math.random()-.5).slice(0,8);
@@ -1304,13 +1309,13 @@ async function syncNow(manual){
       if(g&&g.files&&g.files[GIST_FILE]){const f=g.files[GIST_FILE];const txt=f.truncated?await (await fetch(f.raw_url,{cache:'no-store'})).text():f.content;remote=await decObj(txt,c.pass)}}
     const localDirty=(S._mod||0)>(c.lastLocal||0),remoteNew=remote&&(remote._mod||0)>(c.lastRemote||0);
     if(remote&&remoteNew){
-      let useRemote=!localDirty;
-      if(localDirty&&!c.lastRemote)useRemote=confirm('Ya hay datos sincronizados de tu otro dispositivo.\n\nAceptar = usar esos datos (recomendado si este dispositivo es nuevo).\nCancelar = juntarlos con los de aquí.');
+      const useRemote=!localDirty&&!!c.lastRemote;
+      try{localStorage.setItem('lumi_prev',JSON.stringify({at:Date.now(),state:S}))}catch(e){}
       const next=useRemote?keepLocal(remote):mergeState(S,remote);
       S=Object.assign(JSON.parse(JSON.stringify(DEF)),next);if(!useRemote)S._mod=Date.now();changed=true;
       lastJSON=JSON.stringify({...S,_mod:0});localStorage.setItem(KEY,JSON.stringify(S));
       if(S.stage&&$('#obName'))closeSheet()}
-    if(!remote||(S._mod||0)>(remote._mod||0)){const content=await encObj(S,c.pass);
+    if(!remote||changed||(S._mod||0)>(remote._mod||0)){if(changed)S._mod=Math.max(Date.now(),(remote&&remote._mod||0)+1);localStorage.setItem(KEY,JSON.stringify(S));const content=await encObj(S,c.pass);
       if(c.gist)await gh('PATCH','/gists/'+c.gist,{files:{[GIST_FILE]:{content}}});
       else{const g=await gh('POST','/gists',{description:GIST_DESC,public:false,files:{[GIST_FILE]:{content}}});c.gist=g.id}
       c.lastRemote=S._mod}
