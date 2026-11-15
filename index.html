@@ -93,7 +93,7 @@ textarea{min-height:110px;resize:vertical;font-family:var(--sans)}
 #toast.on{opacity:1;transform:translate(-50%,0)}
 .week{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;text-align:center}.week div{font-size:11px;color:var(--mute);text-transform:capitalize}
 .week i{display:block;margin:6px auto 0;width:32px;height:32px;border-radius:11px;background:#f3e6eb}
-.moods{display:flex;gap:6px;flex-wrap:wrap}.moods button{font-size:25px;border:2px solid transparent;background:#fff;border-radius:14px;padding:5px 8px;cursor:pointer}.moods button.on{border-color:var(--rose);background:var(--rose-l)}
+.moods{display:flex;gap:6px;flex-wrap:wrap}.moods button{font-size:25px;border:2px solid transparent;background:#fff;border-radius:14px;padding:5px 8px;cursor:pointer}.moods button{transition:transform .15s}.moods button.on{border-color:var(--rose);background:var(--rose-l);transform:scale(1.12);box-shadow:0 0 0 2px var(--rose)}
 .warn{background:#fff4e5;border:1px solid #f4d9b0;color:#8a5a14;border-radius:16px;padding:12px 14px;font-size:13px;margin-bottom:14px}
 .drawn{background:linear-gradient(135deg,#3b1e34,#6a3a5f);color:#fff;border-radius:18px;padding:20px;margin:12px 0;font:500 20px/1.35 var(--serif);text-align:center}
 .recdot{display:inline-block;width:10px;height:10px;border-radius:50%;background:#e23b5a;margin-right:8px;animation:bl 1s infinite}@keyframes bl{50%{opacity:.2}}
@@ -104,6 +104,7 @@ html.dark body{background:radial-gradient(1100px 480px at 110% -10%,#3a1a2c 0,tr
 html.dark .card{box-shadow:none}
 html.dark .chk,html.dark input,html.dark textarea,html.dark select,html.dark .chip,html.dark .witem,html.dark .tile,html.dark .moods button,html.dark .pad button:not(.n),html.dark .msg.a,html.dark .stat div{background:var(--card2);color:var(--ink);border-color:var(--line)}
 html.dark .tile,html.dark .pad button{box-shadow:none}
+html.dark .moods button.on{background:var(--rose-l);border-color:var(--rose);box-shadow:0 0 0 2px var(--rose)}
 html.dark .chip.on{background:var(--rose);border-color:var(--rose);color:#fff}
 html.dark .chk.on{background:linear-gradient(90deg,#3d2232,var(--card2))}
 html.dark .chk.sel{background:var(--rose-l);border-color:var(--rose)}
@@ -175,8 +176,8 @@ html.dark #toast{background:#f3e6ee;color:#17101a}
 
 <script>
 'use strict';
-const APP_V='1.22';
-const APP_NEWS='Sincronización: te pregunta antes de borrar cosas que faltan en el otro dispositivo';
+const APP_V='1.23';
+const APP_NEWS='Arreglado: ahora se ve qué emoji has elegido en el diario (modo oscuro)';
 /* ================= Datos ================= */
 const KEY='lumi_v1';
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
