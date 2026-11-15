@@ -150,6 +150,7 @@ html.dark #toast{background:#f3e6ee;color:#17101a}
   <button data-act="go" data-v="diario"><span>📔</span>Diario</button>
   <button data-act="go" data-v="rutinas"><span>✨</span>Rutinas</button>
   <button data-act="go" data-v="voz"><span>🎤</span>Voz</button>
+  <button data-act="go" data-v="intimo" data-nav="int"><span>🔒</span>Privado</button>
   <button data-act="go" data-v="mas"><span>💗</span>Más</button>
 </nav>
 
@@ -173,8 +174,8 @@ html.dark #toast{background:#f3e6ee;color:#17101a}
 
 <script>
 'use strict';
-const APP_V='1.18';
-const APP_NEWS='Niveles 🔥 automáticos: por orden progresivo o con IA, al importar y en tus tareas';
+const APP_V='1.19';
+const APP_NEWS='Íntimo con botón propio en el menú y nuevo Modo sesión: tareas una a una, con temporizador y resumen';
 /* ================= Datos ================= */
 const KEY='lumi_v1';
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
@@ -268,7 +269,7 @@ const fmtLong=d=>d.toLocaleDateString('es-ES',{weekday:'long',day:'numeric',mont
 const mmss=s=>pad2(Math.floor(s/60))+':'+pad2(s%60);
 const fv=id=>{const e=document.getElementById(id);return e?e.value.trim():''};
 function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('on'),2200)}
-const VICON={hoy:'🌸',diario:'📔',rutinas:'✨',voz:'🎤',mas:'💗',armario:'👗',salud:'💊',intimo:'🔒',retos:'🌟',ajustes:'⚙️',chat:'💬',ia:'🤖',entreno:'🏋️',progreso:'📈'};
+const VICON={hoy:'🌸',diario:'📔',rutinas:'✨',voz:'🎤',mas:'💗',armario:'👗',salud:'💊',intimo:'🔒',retos:'🌟',ajustes:'⚙️',chat:'💬',ia:'🤖',entreno:'🏋️',progreso:'📈',sesion:'🔥'};
 function head(title,sub,back){const ic=typeof view!=='undefined'&&view!=='hoy'?VICON[view]:'';return `${back?`<button class="back" style="border:0;background:none;color:var(--rose-d);font:600 14px var(--sans);padding:0;margin:0 0 8px;cursor:pointer" data-act="go" data-v="${back}">‹ Volver</button>`:''}<div class="hd">${ic?`<div class="hdi">${ic}</div>`:''}<div class="hdt"><div class="sub">${sub||''}</div><h1>${title}</h1></div></div>`}
 function sheet(html){$('#sheetCard').innerHTML=html;$('#sheet').classList.remove('hidden');$('#sheetCard').scrollTop=0}
 function closeSheet(){$('#sheet').classList.add('hidden');if(timer){clearInterval(timer);timer=null}}
@@ -546,8 +547,8 @@ function retoHoy(){const t=ymd(),pool=retoPool();if(!pool.length)return null;
 
 /* ================= Vistas ================= */
 let view='hoy',dseg='entradas',metric='cintura',wf='todo',ilvl=0,drawn=null,icat='',intShown=false,iexp=null;
-const VIEWS={hoy:vHoy,diario:vDiario,rutinas:vRutinas,voz:vVoz,mas:vMas,armario:vArmario,salud:vSalud,intimo:vIntimo,retos:vRetos,chat:vChat,ia:vIA,entreno:vEntreno,progreso:vProgreso,ajustes:vAjustes};
-const MAS=['armario','salud','intimo','retos','ajustes','chat','ia','entreno','progreso'];
+const VIEWS={hoy:vHoy,diario:vDiario,rutinas:vRutinas,voz:vVoz,mas:vMas,armario:vArmario,salud:vSalud,intimo:vIntimo,sesion:vSesion,retos:vRetos,chat:vChat,ia:vIA,entreno:vEntreno,progreso:vProgreso,ajustes:vAjustes};
+const MAS=['armario','salud','intimo','retos','ajustes','chat','ia','entreno','progreso','sesion'];
 function go(v){if(v!==view)stopMic();view=v;drawn=null;render();window.scrollTo(0,0)}
 function applyTheme(){const t=S.settings.theme||'dark';const dark=t==='dark'||(t==='auto'&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches);
   document.documentElement.classList.toggle('dark',dark);const m=document.querySelector('meta[name=theme-color]');if(m)m.content=dark?'#17101a':'#fbf5f3'}
@@ -555,13 +556,13 @@ if(window.matchMedia)matchMedia('(prefers-color-scheme: dark)').addEventListener
 function render(){
   applyTheme();
   $('#main').innerHTML=VIEWS[view]();
-  document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===view||(b.dataset.v==='mas'&&MAS.includes(view))));
+  document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===view||(b.dataset.v==='intimo'&&view==='sesion')||(b.dataset.v==='mas'&&MAS.includes(view)&&!((view==='intimo'||view==='sesion')&&S.settings.intNav!==false))));
   document.title=S.settings.discreet?'Notas':'Lumi';
   renderNav();hydrate();
   if(view==='ia')setTimeout(()=>window.scrollTo(0,document.body.scrollHeight),30);
   const fab=$('#fab');
-  if(hasAI()){fab.removeAttribute('href');fab.dataset.act='go';fab.dataset.v='ia';fab.textContent='✨';fab.style.display=view==='ia'?'none':'grid'}
-  else if(S.settings.botUrl){delete fab.dataset.act;fab.href=S.settings.botUrl;fab.textContent='💬';fab.style.display='grid'}else fab.style.display='none';
+  if(hasAI()){fab.removeAttribute('href');fab.dataset.act='go';fab.dataset.v='ia';fab.textContent='✨';fab.style.display=(view==='ia'||view==='sesion')?'none':'grid'}
+  else if(S.settings.botUrl){delete fab.dataset.act;fab.href=S.settings.botUrl;fab.textContent='💬';fab.style.display=view==='sesion'?'none':'grid'}else fab.style.display='none';
 }
 
 function vHoy(){
@@ -747,6 +748,30 @@ async function aiLevels(list,onProg){const N=40;let done=0,fail=0;
     catch(e){fail++;if(/clave|Límite/.test(e.message||''))throw e}
     done=Math.min(list.length,k+N);onProg&&onProg(done,list.length)}
   return fail}
+let ses=null,sesCfg={cats:[],lvls:[],n:5,prog:true},wake=null;
+async function keepAwake(on){try{if(on&&navigator.wakeLock&&!wake){wake=await navigator.wakeLock.request('screen');wake.addEventListener('release',()=>wake=null)}else if(!on&&wake){await wake.release();wake=null}}catch(e){}}
+function sesPool(){return S.intimate.filter(i=>(!sesCfg.cats.length||sesCfg.cats.includes(i.cat||''))&&(!sesCfg.lvls.length||sesCfg.lvls.includes(i.lvl)))}
+function vSesion(){
+  let h=head('Modo sesión','Solo para ti',S.settings.intNav===false?'intimo':'intimo');
+  if(!ses){const cats=[...(S.intCats||[]).filter(c=>S.intimate.some(i=>i.cat===c)),...(S.intimate.some(i=>!i.cat)?['']:[])],pool=sesPool();
+    h+=`<div class="card"><h2>Categorías</h2><div class="chips" style="margin:0">${cats.map(c=>`<button class="chip ${sesCfg.cats.includes(c)?'on':''}" data-act="sesCat" data-c="${esc(c)}">${esc(c||'Sin categoría')}</button>`).join('')||'<span class="small mute">Sin categorías: entran todas.</span>'}</div><div class="small mute" style="margin-top:8px">${sesCfg.cats.length?'':'Ninguna marcada = todas.'}</div></div>
+    <div class="card"><h2>Nivel</h2><div class="chips" style="margin:0">${[1,2,3].map(l=>`<button class="chip ${sesCfg.lvls.includes(l)?'on':''}" data-act="sesLvl" data-l="${l}">${FL[l]}</button>`).join('')}</div><div class="small mute" style="margin-top:8px">${sesCfg.lvls.length?'':'Ninguno marcado = todos.'}</div></div>
+    <div class="card"><h2>Cuántas tareas</h2><div class="chips" style="margin:0">${[3,5,10,20,0].map(n=>`<button class="chip ${sesCfg.n===n?'on':''}" data-act="sesN" data-n="${n}">${n||'Sin límite'}</button>`).join('')}</div>
+    <div class="li" style="margin-top:10px"><div class="grow"><b>Subir intensidad poco a poco</b><div class="small mute">Empieza por 🔥 y termina en 🔥🔥🔥</div></div><button class="sw ${sesCfg.prog?'on':''}" data-act="sesProg"></button></div></div>
+    <button class="btn block" style="padding:16px;font-size:17px" data-act="sesStart" ${pool.length?'':'disabled style="opacity:.5"'}>▶ Empezar (${pool.length} disponibles)</button>`;
+    return h}
+  if(ses.i>=ses.q.length){const mins=Math.max(1,Math.round((Date.now()-ses.t0)/60000));
+    return h+`<div class="card" style="text-align:center;padding:30px 20px"><div style="font-size:48px">🎉</div><div style="font:500 26px var(--serif);margin:8px 0">Sesión terminada</div>
+    <div class="stat" style="margin:18px 0"><div><b>${ses.ok}</b><span>hechas</span></div><div><b>${ses.skip}</b><span>saltadas</span></div><div><b>${mins}</b><span>minutos</span></div></div>
+    <div class="row"><button class="btn block" data-act="sesAgain">Otra sesión</button><button class="btn soft block" data-act="sesExit">Salir</button></div></div>`}
+  const it=S.intimate.find(x=>x.id===ses.q[ses.i])||{text:'(tarea borrada)',lvl:1};
+  return h+`<div class="row between small mute" style="margin-bottom:6px"><span>Tarea ${ses.i+1}${ses.q.length?' de '+ses.q.length:''}</span><span>✓ ${ses.ok}</span></div>
+  <div class="bar" style="margin:0 0 16px"><i style="width:${100*ses.i/ses.q.length}%"></i></div>
+  <div class="drawn" style="min-height:240px;display:flex;flex-direction:column;justify-content:center;font-size:24px;padding:30px 22px">${esc(it.text)}
+  <div style="font-size:15px;margin-top:14px;opacity:.85">${FL[it.lvl]||''}${it.cat?' · '+esc(it.cat):''}</div>
+  ${it.mins?`<div><button class="btn" style="margin-top:16px;background:rgba(255,255,255,.2);font-size:18px" data-act="gTimer" data-s="${it.mins*60}">▶ ${mmss(it.mins*60)}</button></div>`:''}</div>
+  <div class="row"><button class="btn block" style="padding:16px;font-size:17px" data-act="sesOk">✓ Hecha</button><button class="btn ghost block" style="padding:16px" data-act="sesSkip">⏭ Saltar</button></div>
+  <button class="btn soft block" style="margin-top:10px" data-act="sesEnd">Terminar sesión</button>`}
 function intHoy(){if(!S.intimate.length)return null;const t=ymd();
   if(!S.intPick||S.intPick.date!==t||!S.intimate.some(x=>x.id===S.intPick.id)){const it=S.intimate[Math.floor(Math.random()*S.intimate.length)];S.intPick={date:t,id:it.id,done:false};save()}
   return {...S.intPick,item:S.intimate.find(x=>x.id===S.intPick.id)}}
@@ -754,13 +779,15 @@ function vIntimo(){
   let h=head('Íntimo','Solo para ti','mas');
   if(!S.settings.pin)h+=`<div class="warn">🔒 Te recomiendo poner un PIN en <b>Ajustes</b> para que nadie vea esta sección si coge tu móvil.</div>`;
   if(S.settings.botUrl)h+=`<a class="btn ghost block" style="text-align:center;text-decoration:none;margin-bottom:14px" href="${esc(S.settings.botUrl)}" target="_blank" rel="noopener noreferrer">💬 Hablar con Valeria en Crushon ↗</a>`;
+  if(S.intimate.length)h+=`<button class="btn block" style="padding:16px;font-size:17px;margin-bottom:14px;background:linear-gradient(135deg,#c4577e,#8b6bbf)" data-act="go" data-v="sesion">${ses&&ses.i<ses.q.length?'▶ Seguir con tu sesión':'▶ Modo sesión'}</button>`;
   const cats=S.intCats||[];if(icat&&!cats.includes(icat))icat='';
   const pool=S.intimate.filter(i=>(!ilvl||i.lvl===ilvl)&&(!icat||i.cat===icat));
   h+=`<div class="card"><h2>🎲 Sacar una tarea</h2>
   ${cats.length?`<div class="chips" style="margin-bottom:8px"><button class="chip ${!icat?'on':''}" data-act="icat" data-c="">Todas</button>${cats.map(c=>`<button class="chip ${icat===c?'on':''}" data-act="icat" data-c="${esc(c)}">${esc(c)}</button>`).join('')}</div>`:''}
   <div class="chips">${[0,1,2,3].map(l=>`<button class="chip ${ilvl===l?'on':''}" data-act="ilvl" data-l="${l}">${l?FL[l]:'Cualquier nivel'}</button>`).join('')}</div>
   ${drawn?`<div class="drawn">${esc(drawn.text)}<div style="font-size:14px;margin-top:8px">${FL[drawn.lvl]||''}${drawn.cat?' · '+esc(drawn.cat):''}</div>${drawn.mins?`<button class="btn sm" style="margin-top:12px;background:rgba(255,255,255,.18)" data-act="gTimer" data-s="${drawn.mins*60}">▶ ${mmss(drawn.mins*60)}</button>`:''}</div><div class="row"><button class="btn block" data-act="intDone">✓ Hecha</button><button class="btn ghost block" data-act="drawInt">Otra</button></div>`:`<button class="btn block" data-act="drawInt" ${pool.length?'':'disabled style="opacity:.5"'}>🎲 Sacar al azar (${pool.length})</button>`}</div>`;
-  h+=`<div class="card"><div class="li"><div class="grow"><b>Reto íntimo del día</b><div class="mute small">Te sale cada día en Hoy, tapado. Solo se ve si lo tocas.</div></div><button class="sw ${S.settings.intDaily?'on':''}" data-act="intDaily"></button></div></div>`;
+  h+=`<div class="card"><div class="li"><div class="grow"><b>Reto íntimo del día</b><div class="mute small">Te sale cada día en Hoy, tapado. Solo se ve si lo tocas.</div></div><button class="sw ${S.settings.intDaily?'on':''}" data-act="intDaily"></button></div>
+  <div class="li"><div class="grow"><b>Botón 🔒 Privado en el menú de abajo</b><div class="mute small">Para entrar directo sin pasar por Más.</div></div><button class="sw ${S.settings.intNav!==false?'on':''}" data-act="intNav"></button></div></div>`;
   h+=`<div class="card"><h2>Mis tareas <span class="row" style="gap:6px"><button class="btn sm soft" data-act="intCats">Categorías</button><button class="btn sm soft" data-act="intImport">📥 Importar</button>${S.intimate.length?'<button class="btn sm soft" data-act="intLevels">🎚️</button><button class="btn sm soft" data-act="intBulkDel">🗑</button>':''}<button class="btn sm" data-act="editInt">＋</button></span></h2><p class="small mute" style="margin:0 0 10px">Tú escribes tus tareas. Se guardan solo en este dispositivo.</p>
   ${(()=>{const row=i=>`<div class="li"><div class="grow">${esc(i.text)}<div class="small">${FL[i.lvl]||''}${i.cat?` <span class="tag l" style="margin:0 0 0 4px">${esc(i.cat)}</span>`:''}${i.mins?` <span class="mute">· ⏱ ${i.mins} min</span>`:''}</div></div><button class="x" data-act="editInt" data-id="${i.id}">✎</button><button class="x" data-act="delInt" data-id="${i.id}">✕</button></div>`;
     if(!S.intimate.length)return '<div class="empty">Todavía no has escrito ninguna.</div>';
@@ -880,7 +907,7 @@ async function toggleRec(){
 /* ================= Bloqueo PIN ================= */
 function hashPin(p){let h=5381;for(const ch of 'lumi:'+p)h=(((h<<5)+h)+ch.charCodeAt(0))>>>0;let h2=52711;for(const ch of p+':imul')h2=(Math.imul(h2^ch.charCodeAt(0),2654435761))>>>0;return h.toString(36)+h2.toString(36)}
 let pinBuf='';
-function showLock(){pinBuf='';intShown=false;drawn=null;drawDots();$('#lock').classList.remove('hidden');closeSheet();stopMic()}
+function showLock(){pinBuf='';intShown=false;drawn=null;if(view==='sesion'||view==='intimo'){view='hoy';render()}drawDots();$('#lock').classList.remove('hidden');closeSheet();stopMic()}
 function drawDots(){document.querySelectorAll('#dots i').forEach((d,i)=>d.classList.toggle('on',i<pinBuf.length))}
 let hiddenAt=0;
 document.addEventListener('visibilitychange',()=>{if(document.hidden){hiddenAt=Date.now();stopMic()}else if(S.settings.pin&&hiddenAt&&Date.now()-hiddenAt>60000)showLock()});
@@ -1111,6 +1138,18 @@ const ACT={
       const it={id:uid(),text:l.text,lvl:l.lvl||(mode==='pos'||mode==='ai'?l.auto:dl),cat:c,mins:l.mins||0};S.intimate.push(it);added.push(it);n++}
     if(mode==='ai'&&added.length){save();ACT.levelsRun(null,added);return}
     save();closeSheet();render();toast(n?`${n} tareas importadas ✓`:'Ya las tenías todas')},
+  sesCat:el=>{const c=el.dataset.c,a=sesCfg.cats,k=a.indexOf(c);k<0?a.push(c):a.splice(k,1);render()},
+  sesLvl:el=>{const l=+el.dataset.l,a=sesCfg.lvls,k=a.indexOf(l);k<0?a.push(l):a.splice(k,1);render()},
+  sesN:el=>{sesCfg.n=+el.dataset.n;render()},
+  sesProg:()=>{sesCfg.prog=!sesCfg.prog;render()},
+  sesStart:()=>{let p=[...sesPool()].sort(()=>Math.random()-.5);if(sesCfg.n)p=p.slice(0,sesCfg.n);if(sesCfg.prog)p.sort((a,b)=>a.lvl-b.lvl);
+    if(!p.length)return toast('No hay tareas con ese filtro');ses={q:p.map(x=>x.id),i:0,ok:0,skip:0,t0:Date.now()};keepAwake(true);render();window.scrollTo(0,0)},
+  sesOk:()=>{const it=S.intimate.find(x=>x.id===ses.q[ses.i]);if(it)S.intimateLog.push({date:ymd(),text:it.text});ses.ok++;ses.i++;if(timer){clearInterval(timer);timer=null}save();if(navigator.vibrate)navigator.vibrate(60);if(ses.i>=ses.q.length)keepAwake(false);render();window.scrollTo(0,0)},
+  sesSkip:()=>{ses.skip++;ses.i++;if(timer){clearInterval(timer);timer=null}if(ses.i>=ses.q.length)keepAwake(false);render();window.scrollTo(0,0)},
+  sesEnd:()=>{if(timer){clearInterval(timer);timer=null}ses.q=ses.q.slice(0,ses.i);keepAwake(false);render()},
+  sesAgain:()=>{ses=null;render()},
+  sesExit:()=>{ses=null;keepAwake(false);go('intimo')},
+  intNav:()=>{S.settings.intNav=S.settings.intNav===false;save();render()},
   intLevels:()=>{const cats=[...(S.intCats||[])].filter(c=>S.intimate.some(i=>i.cat===c));
     sheet(`<h3>🎚️ Niveles automáticos</h3><p class="small mute" style="margin-top:-4px">Pon el nivel 🔥 de tus tareas automáticamente.</p>
     <label class="f">¿Qué tareas?</label><select id="lvScope"><option value="__all">Todas (${S.intimate.length})</option>${cats.map(c=>`<option value="${esc(c)}">${esc(c)} (${S.intimate.filter(i=>i.cat===c).length})</option>`).join('')}${S.intimate.some(i=>!i.cat)?'<option value="">Sin categoría</option>':''}</select>
@@ -1181,7 +1220,7 @@ document.addEventListener('input',e=>{if(e.target.id==='impText'){const c=$('#im
 document.addEventListener('change',async e=>{if(e.target.id==='impFile'&&e.target.files&&e.target.files[0]){const t=await e.target.files[0].text();const ta=$('#impText');if(ta){ta.value=(ta.value?ta.value+'\n':'')+t;ta.dispatchEvent(new Event('input',{bubbles:true}))}return}const pv=e.target.dataset&&e.target.dataset.prev;if(pv&&e.target.files&&e.target.files[0]){const box=document.getElementById(pv);if(box)box.innerHTML=`<img src="${URL.createObjectURL(e.target.files[0])}" style="width:100%;height:100%;object-fit:cover">`}if(e.target.dataset.chg==='name'){S.settings.name=e.target.value.trim();save();toast('Guardado ✓')}});
 
 function stageOpts(act){return STAGES.slice(1).map((s,i)=>`<button class="chk ${S.stage===i+1?'sel':''}" data-act="${act}" data-s="${i+1}"><span class="ic">${s.e}</span><span class="tx"><b>${s.n}</b><small>${s.d}</small></span></button>`).join('')}
-function renderNav(){document.querySelectorAll('.nav button').forEach(b=>{const v=b.dataset.v;b.style.display=SECS.some(s=>s[0]===v)&&!secOn(v)?'none':''})}
+function renderNav(){document.querySelectorAll('.nav button').forEach(b=>{const v=b.dataset.v;b.style.display=(SECS.some(s=>s[0]===v)&&!secOn(v))||(b.dataset.nav==='int'&&S.settings.intNav===false)?'none':''})}
 function welcome(){sheet(`<h3>Bienvenida 🌸</h3><p class="mute" style="margin-top:-4px">Vamos a adaptar la app a ti. Todo se puede cambiar luego en Ajustes.</p>
   <label class="f">¿Cómo quieres que te llame? (opcional)</label><input id="obName" value="${esc(S.settings.name)}">${nameUI('obName')}
   <label class="f">¿En qué punto estás?</label>${stageOpts('obStage')}
