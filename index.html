@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#fbf5f3">
+<meta name="referrer" content="no-referrer">
+<title>Lumi</title>
+<style>
+:root{--bg:#fbf5f3;--card:#fff;--ink:#3b1e34;--mute:#937a8c;--rose:#c4577e;--rose-d:#a23f66;--rose-l:#f7e1e8;--lila:#8b6bbf;--lila-l:#ece4f6;--line:#f0e2e7;--serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;--sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;color:var(--ink);font:15px/1.45 var(--sans)}
+body{min-height:100vh;background:radial-gradient(1100px 480px at 110% -10%,#f6dbe5 0,transparent 60%),radial-gradient(900px 400px at -25% 0,#ece2f6 0,transparent 55%),var(--bg);background-attachment:fixed}
+main{max-width:640px;margin:0 auto;padding:calc(env(safe-area-inset-top) + 20px) 22px calc(100px + env(safe-area-inset-bottom))}
+.hd{margin:6px 2px 18px}.hd .sub{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute)}
+.hd h1{font:500 32px/1.1 var(--serif);margin:4px 0 0;letter-spacing:-.01em}
+.hd .back{border:0;background:none;color:var(--rose-d);font:600 14px var(--sans);padding:0;margin-bottom:8px;cursor:pointer}
+.card{background:var(--card);border-radius:22px;padding:18px;margin-bottom:14px;border:1px solid var(--line);box-shadow:0 1px 2px rgba(80,30,60,.04),0 10px 26px -14px rgba(120,40,80,.2)}
+.card h2{font:600 12px var(--sans);letter-spacing:.12em;text-transform:uppercase;color:var(--mute);margin:0 0 12px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.btn{appearance:none;border:0;border-radius:14px;padding:12px 16px;font:600 15px var(--sans);background:var(--rose);color:#fff;cursor:pointer}
+.btn:active{transform:scale(.98)}
+.btn.ghost{background:var(--rose-l);color:var(--rose-d)}.btn.soft{background:#f3ecef;color:var(--ink)}
+.btn.sm{padding:7px 12px;font-size:13px;border-radius:11px}.btn.block{width:100%;display:block}.btn.danger{background:#fbe4e4;color:#b23b3b}
+.chk{display:flex;align-items:center;gap:12px;width:100%;padding:11px 12px;border:1px solid var(--line);background:#fff;border-radius:16px;margin-bottom:8px;font:inherit;color:inherit;text-align:left;cursor:pointer;transition:background .15s}
+.chk:last-child{margin-bottom:0}
+.chk .ic{font-size:19px;width:36px;height:36px;flex:none;display:grid;place-items:center;background:var(--rose-l);border-radius:12px}
+.chk .tx{flex:1}.chk small{display:block;color:var(--mute);font-size:12px}
+.chk .tick{width:26px;height:26px;flex:none;border-radius:50%;border:2px solid #e6d3db;display:grid;place-items:center;color:#fff;font-weight:700;font-size:14px}
+.chk.sel{border-color:var(--rose);background:var(--rose-l);box-shadow:0 0 0 2px var(--rose-l)}
+.bar{height:8px;border-radius:99px;background:#f3e3ea;overflow:hidden;margin:10px 0 6px}.bar i{display:block;height:100%;background:linear-gradient(90deg,#c4577e,#8b6bbf);border-radius:99px}
+.chk.on{background:linear-gradient(90deg,#fdf0f4,#fff)}.chk.on .tick{background:var(--rose);border-color:var(--rose)}.chk.on .tx{color:var(--mute);text-decoration:line-through}
+.nav{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:space-around;padding:8px 16px calc(8px + env(safe-area-inset-bottom));background:rgba(255,250,251,.88);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-top:1px solid var(--line);z-index:10}
+.nav button{flex:1;border:0;background:none;font:600 11px var(--sans);color:var(--mute);display:flex;flex-direction:column;align-items:center;gap:2px;padding:5px 0;cursor:pointer}
+.nav button span{font-size:21px;filter:grayscale(.7);opacity:.7}
+.nav button.on{color:var(--rose-d)}.nav button.on span{filter:none;opacity:1}
+.row{display:flex;gap:10px;align-items:center}.between{justify-content:space-between}.wrap{flex-wrap:wrap}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.chip{border:1px solid var(--line);background:#fff;border-radius:999px;padding:7px 14px;font:600 13px var(--sans);color:var(--ink);cursor:pointer}
+.chip.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.mute{color:var(--mute)}.small{font-size:13px}
+.empty{color:var(--mute);text-align:center;padding:16px 8px;font-size:14px}
+.sheet{position:fixed;inset:0;z-index:30;display:flex;align-items:flex-end;justify-content:center}.sheet.hidden{display:none}
+.sheet-bg{position:absolute;inset:0;background:rgba(40,15,35,.4)}
+.sheet-card{position:relative;background:var(--bg);width:100%;max-width:640px;max-height:90vh;overflow:auto;border-radius:26px 26px 0 0;padding:24px 22px calc(24px + env(safe-area-inset-bottom));animation:up .22s ease}
+@keyframes up{from{transform:translateY(40px);opacity:0}}
+.sheet-card h3{font:500 25px var(--serif);margin:0 0 12px}
+label.f{display:block;font-size:11px;font-weight:700;color:var(--mute);letter-spacing:.08em;margin:12px 0 5px;text-transform:uppercase}
+input,textarea,select{width:100%;font:16px var(--sans);padding:12px 14px;border:1px solid #ead8df;border-radius:14px;background:#fff;color:var(--ink);outline:none}
+input:focus,textarea:focus,select:focus{border-color:var(--rose);box-shadow:0 0 0 3px var(--rose-l)}
+input[type=file]{padding:10px;font-size:14px}
+textarea{min-height:110px;resize:vertical;font-family:var(--sans)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}
+.actions{display:flex;gap:10px;margin-top:18px}.actions .btn{flex:1}
+.entry{padding:14px 0;border-bottom:1px solid var(--line)}.entry:first-of-type{padding-top:0}.entry:last-child{border:0;padding-bottom:0}
+.entry .txt{white-space:pre-wrap;margin-top:6px}
+.photo{width:100%;border-radius:16px;margin-top:10px;display:block;max-height:420px;object-fit:cover;background:var(--rose-l)}
+.ward{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.witem{background:#fff;border:1px solid var(--line);border-radius:18px;overflow:hidden;cursor:pointer;text-align:left;padding:0;font:inherit;color:inherit}
+.witem .ph{aspect-ratio:1;background:linear-gradient(135deg,var(--rose-l),var(--lila-l));display:grid;place-items:center;font-size:40px;overflow:hidden}
+.witem .ph img{width:100%;height:100%;object-fit:cover}
+.witem .in{padding:10px 12px}.witem b{display:block;font-size:14px;line-height:1.25}
+.tag{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;background:var(--rose-l);color:var(--rose-d);margin-top:4px}
+.tag.l{background:var(--lila-l);color:#6a4c9c}
+.li{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--line)}.li:last-child{border:0;padding-bottom:0}.li:first-child{padding-top:0}
+.li .grow{flex:1;min-width:0}
+.x{border:0;background:none;color:var(--mute);font-size:17px;padding:4px 8px;cursor:pointer;flex:none}
+.big{font:500 56px/1 var(--serif)}
+.meter{position:relative;height:14px;border-radius:99px;display:flex;margin:16px 0 6px}
+.meter i{display:block;height:100%}.meter i:first-child{border-radius:99px 0 0 99px}.meter i:last-of-type{border-radius:0 99px 99px 0}
+.marker{position:absolute;top:-5px;width:5px;height:24px;background:var(--ink);border-radius:3px;transition:left .12s;left:0;display:none}
+.reto{background:linear-gradient(135deg,#c4577e,#8b6bbf);color:#fff;border:0}
+.reto h2{color:rgba(255,255,255,.78)}.reto p{font:500 21px/1.3 var(--serif);margin:0 0 16px}
+.reto .btn{background:rgba(255,255,255,.2);color:#fff}.reto .btn.w{background:#fff;color:var(--rose-d)}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.tile{background:#fff;border:1px solid var(--line);border-radius:22px;padding:18px;text-align:left;cursor:pointer;font:inherit;color:inherit;box-shadow:0 10px 26px -16px rgba(120,40,80,.25)}
+.tile .e{font-size:30px}.tile b{display:block;font:500 20px var(--serif);margin-top:8px}.tile span{font-size:12px;color:var(--mute)}
+.stat{display:flex;gap:10px}.stat div{flex:1;background:#fdf8f9;border:1px solid var(--line);border-radius:16px;padding:12px 6px;text-align:center}
+.stat b{display:block;font:500 24px var(--serif)}.stat span{font-size:11px;color:var(--mute)}
+.lock{position:fixed;inset:0;z-index:50;background:radial-gradient(800px 500px at 50% 0,#f6dbe5,transparent),var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center}
+.lock.hidden{display:none}
+.dots{display:flex;gap:16px;margin:22px 0 34px}.dots i{width:14px;height:14px;border-radius:50%;border:2px solid var(--rose)}.dots i.on{background:var(--rose)}
+.pad{display:grid;grid-template-columns:repeat(3,74px);gap:16px}
+.pad button{height:74px;border-radius:50%;border:0;background:#fff;font:500 28px var(--serif);color:var(--ink);box-shadow:0 6px 18px -10px rgba(120,40,80,.35);cursor:pointer}
+.pad button.n{background:none;box-shadow:none;font-size:22px}
+.shake{animation:sh .35s}@keyframes sh{25%{transform:translateX(-10px)}75%{transform:translateX(10px)}}
+#toast{position:fixed;left:50%;bottom:calc(92px + env(safe-area-inset-bottom));transform:translate(-50%,20px);background:var(--ink);color:#fff;padding:10px 16px;border-radius:14px;font-size:14px;opacity:0;transition:.25s;pointer-events:none;z-index:60;white-space:nowrap}
+#toast.on{opacity:1;transform:translate(-50%,0)}
+.week{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;text-align:center}.week div{font-size:11px;color:var(--mute);text-transform:capitalize}
+.week i{display:block;margin:6px auto 0;width:32px;height:32px;border-radius:11px;background:#f3e6eb}
+.moods{display:flex;gap:6px;flex-wrap:wrap}.moods button{font-size:25px;border:2px solid transparent;background:#fff;border-radius:14px;padding:5px 8px;cursor:pointer}.moods button.on{border-color:var(--rose);background:var(--rose-l)}
+.warn{background:#fff4e5;border:1px solid #f4d9b0;color:#8a5a14;border-radius:16px;padding:12px 14px;font-size:13px;margin-bottom:14px}
+.drawn{background:linear-gradient(135deg,#3b1e34,#6a3a5f);color:#fff;border-radius:18px;padding:20px;margin:12px 0;font:500 20px/1.35 var(--serif);text-align:center}
+.recdot{display:inline-block;width:10px;height:10px;border-radius:50%;background:#e23b5a;margin-right:8px;animation:bl 1s infinite}@keyframes bl{50%{opacity:.2}}
+audio{width:100%;height:38px;margin-top:6px}
+.msg{max-width:86%;padding:10px 14px;border-radius:18px;margin:8px 0;white-space:pre-wrap;line-height:1.45}
+.msg.u{margin-left:auto;background:var(--rose);color:#fff;border-bottom-right-radius:6px}
+.msg.a{background:#fff;border:1px solid var(--line);border-bottom-left-radius:6px}
+.msg.t{color:var(--mute);font-style:italic}
+.sw{position:relative;width:48px;height:28px;flex:none;border-radius:99px;background:#e9dbe1;border:0;cursor:pointer;transition:.2s}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.sw.on{background:var(--rose)}.sw.on::after{left:23px}
+</style>
+</head>
+<body>
+<main id="main"></main>
+
+<nav class="nav">
+  <button data-act="go" data-v="hoy"><span>🌸</span>Hoy</button>
+  <button data-act="go" data-v="diario"><span>📔</span>Diario</button>
+  <button data-act="go" data-v="rutinas"><span>✨</span>Rutinas</button>
+  <button data-act="go" data-v="voz"><span>🎤</span>Voz</button>
+  <button data-act="go" data-v="mas"><span>💗</span>Más</button>
+</nav>
+
+<div id="sheet" class="sheet hidden"><div class="sheet-bg" data-act="close"></div><div class="sheet-card" id="sheetCard"></div></div>
+
+<div id="lock" class="lock hidden">
+  <div style="font-size:40px">🌸</div>
+  <div class="mute" id="lockMsg" style="margin-top:8px">Introduce tu PIN</div>
+  <div class="dots" id="dots"><i></i><i></i><i></i><i></i></div>
+  <div class="pad" id="pad">
+    <button data-act="key" data-k="1">1</button><button data-act="key" data-k="2">2</button><button data-act="key" data-k="3">3</button>
+    <button data-act="key" data-k="4">4</button><button data-act="key" data-k="5">5</button><button data-act="key" data-k="6">6</button>
+    <button data-act="key" data-k="7">7</button><button data-act="key" data-k="8">8</button><button data-act="key" data-k="9">9</button>
+    <span></span><button data-act="key" data-k="0">0</button><button class="n" data-act="key" data-k="del">⌫</button>
+  </div>
+</div>
+
+<input type="file" id="importFile" accept="application/json,.json" hidden>
+<a id="fab" target="_blank" rel="noopener noreferrer" style="position:fixed;right:18px;bottom:calc(84px + env(safe-area-inset-bottom));width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#c4577e,#8b6bbf);color:#fff;display:none;place-items:center;font-size:26px;text-decoration:none;box-shadow:0 10px 24px -8px rgba(120,40,80,.55);z-index:9" aria-label="Abrir chatbot">💬</a>
+<div id="toast"></div>
+
+<script>
+'use strict';
+/* ================= Datos ================= */
+const KEY='lumi_v1';
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const DEF={
+  settings:{name:'',pin:'',discreet:false},
+  routines:[
+    {id:'r1',icon:'🧴',name:'Limpieza facial de mañana',freq:'diaria'},
+    {id:'r2',icon:'☀️',name:'Hidratante y protector solar',freq:'diaria'},
+    {id:'r3',icon:'🌙',name:'Limpieza y sérum de noche',freq:'diaria'},
+    {id:'r4',icon:'🎤',name:'Ejercicios de voz',freq:'diaria'},
+    {id:'r5',icon:'🧘',name:'Postura y forma de andar',freq:'diaria'},
+    {id:'r6',icon:'🍑',name:'Ejercicio de glúteos y cadera',freq:'diaria'},
+    {id:'r7',icon:'💅',name:'Manicura / uñas',freq:'semanal'},
+    {id:'r8',icon:'✨',name:'Depilación',freq:'semanal'}
+  ],
+  checks:{},
+  journal:[],measures:[],
+  voiceEx:[
+    {id:'v1',name:'Calentamiento: sirenas y vibración de labios',mins:3,tip:'Sube y baja de grave a agudo suavemente, sin forzar la garganta.'},
+    {id:'v2',name:'Resonancia: "mmm" hacia delante',mins:5,tip:'Siente la vibración en labios y nariz, no en el pecho.'},
+    {id:'v3',name:'Lectura en voz femenina',mins:5,tip:'Lee un texto en voz alta manteniendo tono y resonancia. Grábate.'},
+    {id:'v4',name:'Entonación: frases con melodía',mins:3,tip:'Haz frases con más subidas y bajadas de lo normal.'}
+  ],
+  voiceLog:[],recs:[],
+  wardrobe:[],
+  meds:[],medLog:{},appts:[],labs:[],
+  stage:0,sec:{diario:true,voz:true,armario:true,salud:true,intimo:true},
+  retos:[],
+  retoPick:null,retosLog:[],
+  intimate:[],intimateLog:[]
+};
+const STAGES=[null,
+  {n:'Descubrir',e:'🌱',d:'Todavía sin ropa femenina. Conocerte, cuidarte y soñar tu estilo.',r:[
+    'Mídete pecho, cintura y cadera y apúntalo en Medidas','Busca tu talla de mujer (ropa y zapato) y apúntala en el diario',
+    'Guarda 3 prendas que te gustarían en el Armario como "Lo quiero"','Empieza una rutina de piel: limpiador e hidratante',
+    'Piensa un nombre que te guste y ponlo en Ajustes','Mira un vídeo de entrenamiento de voz y haz 5 minutos',
+    'Busca 5 looks que te inspiren y describe en el diario qué te gusta de ellos','Escribe en el diario cómo te gustaría sentirte dentro de un año',
+    'Hidrata manos y labios hoy','Practica postura 10 minutos: hombros atrás, pasos cortos']},
+  {n:'Primeros pasos',e:'🌷',d:'Tus primeras prendas y detalles, en casa y a tu ritmo.',r:[
+    'Compra tu primera prenda pequeña: ropa interior, medias o calcetines bonitos','Lleva puesta tu primera prenda en casa un rato',
+    'Píntate las uñas, aunque sea con brillo transparente','Prueba una crema con color o una base ligera',
+    'Ponte una prenda femenina y hazte una foto para el diario','Depila una zona que te apetezca',
+    'Graba tu voz leyendo un párrafo','Compra un accesorio: pendientes de clip, pulsera o pañuelo',
+    'Practica caminar con pasos cortos 10 minutos','Prueba un perfume o una crema con olor que te guste']},
+  {n:'Ganar confianza',e:'🌸',d:'Looks completos, maquillaje y voz con más seguridad.',r:[
+    'Monta un look completo y llévalo en casa toda una tarde','Maquillaje completo siguiendo un tutorial',
+    'Practica con tacones 15 minutos','Habla 10 minutos seguidos con tu voz femenina',
+    'Hazte una sesión de fotos con tu mejor look','Prueba una peluca o un peinado nuevo',
+    'Escribe 3 cosas que te gustan de cómo te ves','Compra una prenda en una tienda en persona',
+    'Píntate las uñas de color','Repite tu primera grabación de voz y compárala']},
+  {n:'Brillar',e:'✨',d:'Llevar tu feminidad más allá de casa, cuando tú quieras.',r:[
+    'Sal a pasear con un detalle femenino discreto','Pruébate ropa en el probador de una tienda',
+    'Haz una llamada usando tu voz femenina','Hazte la manicura en un centro',
+    'Habla con alguien de confianza sobre cómo te sientes','Busca un grupo o comunidad de apoyo',
+    'Pasa un día entero cuidando cada detalle de tu imagen','Escribe en el diario cuánto has avanzado desde el principio']}
+];
+const STAGE_GOAL=8;
+const NAMES=['Lucía','Valentina','Sofía','Martina','Julia','Paula','Alba','Carla','Daniela','Elena','Irene','Claudia','Laura','Marina','Noa','Vera','Abril','Olivia','Emma','Alma','Lola','Candela','Inés','Andrea','Sara','Nerea','Ariadna','Bianca','Chloe','Gala','Mía','Zoe','Aitana','Luna','Celia','Adriana','Natalia','Victoria','Alexia','Jessica','Vanessa','Sandra','Mónica','Cristina','Raquel','Silvia','Patricia','Verónica','Ainhoa','Lorena','Miriam','Estela','Jimena','Valeria','Estefanía','Rebeca','Diana','Nadia','Tamara','Yolanda'];
+const nameUI=(inId)=>`<div class="chips" id="nb_${inId}" style="margin:10px 0 0"></div><button class="btn sm ghost" style="margin-top:8px" data-act="sugName" data-box="nb_${inId}" data-in="${inId}">✨ Sugiéreme un nombre</button>`;
+const SECS=[['diario','📔','Diario y medidas'],['voz','🎤','Voz'],['armario','👗','Armario'],['salud','💊','Salud'],['intimo','🔒','Íntimo']];
+const secOn=k=>S.sec[k]!==false;
+function stageDone(){return S.retosLog.filter(l=>l.stage===S.stage).length}
+let storageOK=true;
+try{localStorage.setItem('_lt','1');localStorage.removeItem('_lt')}catch(e){storageOK=false}
+function load(){try{const r=JSON.parse(localStorage.getItem(KEY));if(r)return Object.assign(JSON.parse(JSON.stringify(DEF)),r)}catch(e){}return JSON.parse(JSON.stringify(DEF))}
+let S=load();
+if(S.settings.botUrl===undefined)S.settings.botUrl='';
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){toast('⚠️ No se ha podido guardar')}}
+
+/* ================= Fotos y audios (IndexedDB) ================= */
+let _db;
+function idb(){return _db||(_db=new Promise((res,rej)=>{const r=indexedDB.open('lumi_media',1);r.onupgradeneeded=()=>r.result.createObjectStore('m');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)}))}
+async function tx(mode,fn){const db=await idb();return new Promise((res,rej)=>{const t=db.transaction('m',mode);const q=fn(t.objectStore('m'));t.oncomplete=()=>res(q&&q.result);t.onerror=()=>rej(t.error)})}
+async function putMedia(blob,id){id=id||uid();await tx('readwrite',s=>s.put(blob,id));return id}
+const getMedia=id=>tx('readonly',s=>s.get(id));
+const delMedia=id=>id&&tx('readwrite',s=>s.delete(id)).catch(()=>{});
+const urlCache={};
+async function mediaURL(id){if(!id)return'';if(urlCache[id])return urlCache[id];try{const b=await getMedia(id);if(!b)return'';return urlCache[id]=URL.createObjectURL(b)}catch(e){return''}}
+function hydrate(){document.querySelectorAll('[data-media]').forEach(async el=>{const u=await mediaURL(el.dataset.media);if(u)el.src=u})}
+function resizeImg(file,max=1200){return new Promise(res=>{const img=new Image(),u=URL.createObjectURL(file);img.onload=()=>{let w=img.width,h=img.height;const k=Math.min(1,max/Math.max(w,h));w=Math.round(w*k);h=Math.round(h*k);const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);URL.revokeObjectURL(u);c.toBlob(b=>res(b||file),'image/jpeg',.85)};img.onerror=()=>res(file);img.src=u})}
+async function photoFrom(inputId){const f=document.getElementById(inputId);if(!f||!f.files||!f.files[0])return null;return putMedia(await resizeImg(f.files[0]))}
+
+/* ================= Utilidades ================= */
+const $=s=>document.querySelector(s);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pad2=n=>String(n).padStart(2,'0');
+const ymd=d=>{d=d||new Date();return d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate())};
+const dt=s=>new Date(s+'T12:00:00');
+const fmt=s=>dt(s).toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'});
+const fmtLong=d=>d.toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'});
+const mmss=s=>pad2(Math.floor(s/60))+':'+pad2(s%60);
+const fv=id=>{const e=document.getElementById(id);return e?e.value.trim():''};
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('on'),2200)}
+function head(title,sub,back){return `<div class="hd">${back?`<button class="back" data-act="go" data-v="${back}">‹ Volver</button>`:''}<div class="sub">${sub||''}</div><h1>${title}</h1></div>`}
+function sheet(html){$('#sheetCard').innerHTML=html;$('#sheet').classList.remove('hidden');$('#sheetCard').scrollTop=0}
+function closeSheet(){$('#sheet').classList.add('hidden');if(timer){clearInterval(timer);timer=null}}
+function weekStart(d){d=new Date(d||new Date());const k=(d.getDay()+6)%7;d.setDate(d.getDate()-k);return ymd(d)}
+function daysBack(n){const a=[];for(let i=n-1;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);a.push(ymd(d))}return a}
+
+/* ================= Rutinas ================= */
+function isDone(r){
+  if(r.freq==='semanal'){const ws=weekStart();return Object.keys(S.checks).some(d=>d>=ws&&d<=ymd()&&S.checks[d].includes(r.id))}
+  return (S.checks[ymd()]||[]).includes(r.id)
+}
+function streak(){let n=0;const d=new Date();if(!(S.checks[ymd(d)]||[]).length)d.setDate(d.getDate()-1);while((S.checks[ymd(d)]||[]).length){n++;d.setDate(d.getDate()-1)}return n}
+function routineBtn(r){const ok=isDone(r);return `<button class="chk ${ok?'on':''}" data-act="toggleR" data-id="${r.id}"><span class="ic">${esc(r.icon)}</span><span class="tx">${esc(r.name)}${r.freq==='semanal'?'<small>Esta semana</small>':''}</span><span class="tick">${ok?'✓':''}</span></button>`}
+/* ================= IA (OpenRouter) ================= */
+const hasAI=()=>!!S.settings.aiKey;
+let aiBusy=false,tipLoading=false;
+async function ai(messages,max=500,temp=.9,retry=1){
+  max=Math.max(max,1500);
+  const r=await fetch('https://openrouter.ai/api/v1/chat/completions',{method:'POST',
+    headers:{'Authorization':'Bearer '+S.settings.aiKey,'Content-Type':'application/json','X-Title':'Lumi'},
+    body:JSON.stringify({model:S.settings.aiModel||'openrouter/free',messages,max_tokens:max,temperature:temp})});
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok)throw new Error(r.status===401?'La clave no es válida':r.status===429?'Límite de uso alcanzado, prueba más tarde':((j.error&&j.error.message)||'Error '+r.status));
+  const t=((((j.choices||[])[0]||{}).message||{}).content||'').replace(/<think>[\s\S]*?<\/think>/g,'').trim();
+  if(!t&&retry>0)return ai(messages,max,temp,retry-1);
+  return t;
+}
+function aiCtx(){
+  const st=STAGES[S.stage],last=[...S.journal].sort((a,b)=>a.date<b.date?1:-1)[0];
+  return `Datos de la usuaria: se llama ${S.settings.name||'(sin nombre todavía)'}. Etapa ${S.stage||1} de 4: ${st?st.n+' ('+st.d+')':'Descubrir'}. `+
+  `Rutinas: ${S.routines.map(r=>r.name).join(', ')}. Hoy ha hecho: ${S.routines.filter(isDone).map(r=>r.name).join(', ')||'nada aún'}. `+
+  `Retos conseguidos recientemente: ${S.retosLog.slice(-8).map(l=>l.text).join(' | ')||'ninguno'}. `+
+  `${S.wardrobe.length?'Tiene '+S.wardrobe.filter(w=>w.status!=='quiero').length+' prendas y '+S.wardrobe.filter(w=>w.status==='quiero').length+' en su lista de deseos. ':'Aún no tiene ropa femenina. '}`+
+  `${last?'Última entrada del diario ('+last.date+'): '+(last.mood||'')+' '+(last.text||'').slice(0,200):''}`;
+}
+const AI_SYS='Eres Valeria, asistente experta en feminización, imagen y cuidado personal: tallas, ropa y estilo según el cuerpo, maquillaje, cuidado de piel, depilación, voz, postura, pelo y pelucas. Hablas en español de España, cercana, clara y práctica, con explicaciones paso a paso y productos concretos con alternativas baratas. Nunca juzgas. Usas siempre el femenino con la usuaria. Adaptas los consejos a su etapa y nunca la empujas a algo de una etapa a la que no ha llegado. Sobre hormonas o tratamientos médicos das solo información general y nunca dosis: remites siempre a un endocrino o a la unidad de identidad de género. Respuestas breves salvo que pida detalle.';
+async function loadTip(){
+  if(!hasAI()||tipLoading||(S.aiTip&&S.aiTip.date===ymd()))return;tipLoading=true;
+  try{const t=await ai([{role:'system',content:AI_SYS},{role:'user',content:aiCtx()+'\n\nEscríbele un mensaje corto para hoy (máximo 40 palabras): un ánimo personal o un consejo práctico distinto cada día, según su etapa y lo que ha hecho. Sin saludo largo ni comillas.'}],200);
+    if(t){S.aiTip={date:ymd(),text:t};save();if(view==='hoy')render()}}catch(e){}
+  tipLoading=false;
+}
+function retoPool(){const st=STAGES[S.stage];return [...(st?st.r:[]),...S.retos]}
+function retoHoy(){const t=ymd(),pool=retoPool();if(!pool.length)return null;
+  if(!S.retoPick||S.retoPick.date!==t||!S.retoPick.text||S.retoPick.stage!==S.stage){
+    const hechos=S.retosLog.map(l=>l.text);const nuevos=pool.filter(r=>!hechos.includes(r));const p=nuevos.length?nuevos:pool;
+    S.retoPick={date:t,text:p[Math.floor(Math.random()*p.length)],done:false,stage:S.stage};save()}
+  return S.retoPick}
+
+/* ================= Vistas ================= */
+let view='hoy',dseg='entradas',metric='cintura',wf='todo',ilvl=0,drawn=null;
+const VIEWS={hoy:vHoy,diario:vDiario,rutinas:vRutinas,voz:vVoz,mas:vMas,armario:vArmario,salud:vSalud,intimo:vIntimo,retos:vRetos,chat:vChat,ia:vIA,ajustes:vAjustes};
+const MAS=['armario','salud','intimo','retos','ajustes','chat','ia'];
+function go(v){if(v!==view)stopMic();view=v;drawn=null;render();window.scrollTo(0,0)}
+function render(){
+  $('#main').innerHTML=VIEWS[view]();
+  document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===view||(b.dataset.v==='mas'&&MAS.includes(view))));
+  document.title=S.settings.discreet?'Notas':'Lumi';
+  renderNav();hydrate();
+  if(view==='ia')setTimeout(()=>window.scrollTo(0,document.body.scrollHeight),30);
+  const fab=$('#fab');if(S.settings.botUrl){fab.href=S.settings.botUrl;fab.style.display='grid'}else fab.style.display='none';
+}
+
+function vHoy(){
+  const t=ymd(),n=S.settings.name;
+  const tot=S.routines.length,dn=S.routines.filter(isDone).length,pct=tot?dn/tot:0,C=2*Math.PI*34,st=streak();
+  let h=head(n?`Hola, ${esc(n)}`:'Hola ✿',fmtLong(new Date()));
+  if(!storageOK)h+=`<div class="warn">⚠️ Este navegador no deja guardar datos al abrir el archivo así. Lo que apuntes se perderá al cerrar. Usa <b>Exportar copia</b> en Ajustes o ábrelo de otra forma.</div>`;
+  h+=`<div class="card"><div class="row" style="gap:18px">
+    <svg width="86" height="86" viewBox="0 0 84 84"><defs><linearGradient id="g"><stop offset="0" stop-color="#c4577e"/><stop offset="1" stop-color="#8b6bbf"/></linearGradient></defs>
+    <circle cx="42" cy="42" r="34" fill="none" stroke="#f3e3ea" stroke-width="9"/>
+    <circle cx="42" cy="42" r="34" fill="none" stroke="url(#g)" stroke-width="9" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${C*(1-pct)}" transform="rotate(-90 42 42)" style="transition:stroke-dashoffset .4s"/>
+    <text x="42" y="48" text-anchor="middle" font-family="Georgia,serif" font-size="19" fill="#3b1e34">${Math.round(pct*100)}%</text></svg>
+    <div><div class="mute small">Tu cuidado de hoy</div><div style="font:500 22px var(--serif)">${dn} de ${tot} hechas</div><div class="mute small">🔥 Racha: ${st} día${st===1?'':'s'}</div></div></div></div>`;
+  const stg=STAGES[S.stage];
+  if(stg){const dn2=stageDone(),p2=Math.min(1,dn2/STAGE_GOAL);
+    h+=`<div class="card"><div class="row between"><div class="mute small">Tu etapa · ${S.stage} de 4</div><button class="btn sm soft" data-act="pickStage">Cambiar</button></div>
+    <div style="font:500 22px var(--serif);margin-top:2px">${stg.e} ${stg.n}</div><div class="mute small">${stg.d}</div>
+    <div class="bar"><i style="width:${p2*100}%"></i></div><div class="mute small">${Math.min(dn2,STAGE_GOAL)} de ${STAGE_GOAL} retos de esta etapa</div>
+    ${p2>=1&&S.stage<4?`<button class="btn block" style="margin-top:12px" data-act="nextStage">¿Lista? Pasar a ${STAGES[S.stage+1].e} ${STAGES[S.stage+1].n}</button>`:''}</div>`}
+  if(hasAI()){const tip=S.aiTip&&S.aiTip.date===t?S.aiTip.text:'';if(!tip)loadTip();
+    h+=`<div class="card"><h2>💌 Para ti hoy <button class="btn sm ghost" data-act="go" data-v="ia">Preguntar</button></h2><div style="font:500 17px/1.4 var(--serif)">${tip?esc(tip):'<span class="mute">Pensando algo para ti…</span>'}</div></div>`}
+  const rp=retoHoy();
+  if(rp){h+=`<div class="card reto"><h2>Reto del día ${rp.done?'· ✓ conseguido':''}${rp.ai?' · ✨ IA':''}</h2><p>${esc(rp.text)}</p><div class="row wrap">${rp.done?`<button class="btn" data-act="retoOtro">Otro reto</button>`:`<button class="btn w" data-act="retoDone">¡Hecho!</button><button class="btn" data-act="retoOtro">Cambiar</button>`}${hasAI()?`<button class="btn" data-act="retoAI">✨ Inventa uno</button>`:''}</div></div>`}
+  h+=`<div class="card"><h2>Rutinas <button class="btn sm ghost" data-act="go" data-v="rutinas">Editar</button></h2>${S.routines.length?S.routines.map(routineBtn).join(''):'<div class="empty">No tienes rutinas. Añádelas en Rutinas.</div>'}</div>`;
+  if(secOn('salud')&&S.meds.length){const ml=S.medLog[t]||[];h+=`<div class="card"><h2>Medicación de hoy</h2>${S.meds.map(m=>{const ok=ml.includes(m.id);return `<button class="chk ${ok?'on':''}" data-act="toggleM" data-id="${m.id}"><span class="ic">💊</span><span class="tx">${esc(m.name)}<small>${esc(m.dose)}${m.time?' · '+esc(m.time):''}</small></span><span class="tick">${ok?'✓':''}</span></button>`}).join('')}</div>`}
+  const next=S.appts.filter(a=>a.date>=t).sort((a,b)=>a.date<b.date?-1:1)[0];
+  if(secOn('salud')&&next)h+=`<div class="card"><h2>Próxima cita</h2><div style="font:500 19px var(--serif)">${esc(next.text)}</div><div class="mute small">${fmt(next.date)}${next.date===t?' · ¡hoy!':''}</div></div>`;
+  if(secOn('diario'))h+=`<div class="row"><button class="btn block" data-act="newEntry">＋ Diario</button><button class="btn ghost block" data-act="newMeasure">＋ Medidas</button></div>`;
+  return h;
+}
+
+function vRutinas(){
+  let h=head('Rutinas','Tu cuidado diario');
+  const days=daysBack(7),daily=S.routines.filter(r=>r.freq!=='semanal');
+  h+=`<div class="card"><h2>Últimos 7 días</h2><div class="week">${days.map(d=>{const c=(S.checks[d]||[]).filter(id=>daily.some(r=>r.id===id)).length,p=daily.length?c/daily.length:0;return `<div>${dt(d).toLocaleDateString('es-ES',{weekday:'short'}).slice(0,2)}<i style="background:${p?`rgba(196,87,126,${.18+p*.82})`:''}"></i></div>`}).join('')}</div></div>`;
+  h+=`<div class="card"><h2>Hoy</h2>${S.routines.map(routineBtn).join('')||'<div class="empty">Sin rutinas</div>'}</div>`;
+  h+=`<div class="card"><h2>Gestionar <button class="btn sm" data-act="editRoutine">＋ Nueva</button></h2>${S.routines.map(r=>`<div class="li"><span style="font-size:20px">${esc(r.icon)}</span><div class="grow">${esc(r.name)}<div class="mute small">${r.freq==='semanal'?'Semanal':'Diaria'}</div></div><button class="x" data-act="editRoutine" data-id="${r.id}">✎</button><button class="x" data-act="delRoutine" data-id="${r.id}">✕</button></div>`).join('')}</div>`;
+  return h;
+}
+
+const MOODS=['🥰','😊','😌','✨','😐','😔','😢','😤'];
+const MF=[['peso','Peso','kg'],['pecho','Pecho','cm'],['bajo','Bajo pecho','cm'],['cintura','Cintura','cm'],['cadera','Cadera','cm']];
+function vDiario(){
+  let h=head('Diario','Tu camino');
+  h+=`<div class="chips"><button class="chip ${dseg==='entradas'?'on':''}" data-act="dseg" data-s="entradas">Entradas</button><button class="chip ${dseg==='medidas'?'on':''}" data-act="dseg" data-s="medidas">Medidas</button></div>`;
+  if(dseg==='entradas'){
+    h+=`<button class="btn block" style="margin-bottom:14px" data-act="newEntry">＋ Nueva entrada</button>`;
+    const es=[...S.journal].sort((a,b)=>a.date<b.date?1:a.date>b.date?-1:(b.ts||0)-(a.ts||0));
+    h+=`<div class="card">${es.length?es.map(e=>`<div class="entry"><div class="row between"><div><span style="font-size:22px">${e.mood||''}</span> <b>${fmt(e.date)}</b></div><div><button class="x" data-act="newEntry" data-id="${e.id}">✎</button><button class="x" data-act="delEntry" data-id="${e.id}">✕</button></div></div>${e.text?`<div class="txt">${esc(e.text)}</div>`:''}${e.photo?`<img class="photo" data-media="${e.photo}" alt="">`:''}</div>`).join(''):'<div class="empty">Aún no hay entradas. Escribe cómo te sientes, qué has probado, fotos de tu evolución…</div>'}</div>`;
+  }else{
+    const ms=[...S.measures].sort((a,b)=>a.date<b.date?1:-1),last=ms[0];
+    if(last&&last.cintura&&last.cadera)h+=`<div class="card"><div class="stat"><div><b>${last.cintura}</b><span>cintura</span></div><div><b>${last.cadera}</b><span>cadera</span></div><div><b>${(last.cintura/last.cadera).toFixed(2)}</b><span>cintura/cadera</span></div></div></div>`;
+    h+=`<div class="card"><h2>Evolución</h2><div class="chips">${MF.map(m=>`<button class="chip ${metric===m[0]?'on':''}" data-act="metric" data-m="${m[0]}">${m[1]}</button>`).join('')}</div>${chart(metric)}</div>`;
+    h+=`<div class="card"><h2>Registros <button class="btn sm" data-act="newMeasure">＋ Añadir</button></h2>${ms.length?ms.map(m=>`<div class="li"><div class="grow"><b>${fmt(m.date)}</b><div class="mute small">${MF.filter(f=>m[f[0]]).map(f=>`${f[1]} ${m[f[0]]} ${f[2]}`).join(' · ')}</div></div><button class="x" data-act="delMeasure" data-id="${m.id}">✕</button></div>`).join(''):'<div class="empty">Sin medidas todavía.</div>'}</div>`;
+  }
+  return h;
+}
+function chart(key){
+  const f=MF.find(m=>m[0]===key);
+  const pts=S.measures.filter(m=>m[key]!==undefined&&m[key]!==''&&m[key]!==null).sort((a,b)=>a.date<b.date?-1:1);
+  if(pts.length<2)return `<div class="empty">Añade al menos dos medidas de ${f[1].toLowerCase()} para ver la gráfica.</div>`;
+  const W=320,H=150,p=16,ys=pts.map(m=>+m[key]);let mn=Math.min(...ys),mx=Math.max(...ys);if(mn===mx){mn-=1;mx+=1}
+  const x=i=>p+i*(W-2*p)/(pts.length-1),y=v=>H-p-(v-mn)*(H-2*p)/(mx-mn);
+  const d=ys.map((v,i)=>`${i?'L':'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join('');
+  const area=d+`L${x(ys.length-1).toFixed(1)},${H-p}L${x(0).toFixed(1)},${H-p}Z`;
+  const diff=+(ys[ys.length-1]-ys[0]).toFixed(1);
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block"><defs><linearGradient id="ga" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c4577e" stop-opacity=".28"/><stop offset="1" stop-color="#c4577e" stop-opacity="0"/></linearGradient></defs>
+  <path d="${area}" fill="url(#ga)"/><path d="${d}" fill="none" stroke="#c4577e" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+  ${ys.map((v,i)=>`<circle cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="3.5" fill="#fff" stroke="#c4577e" stroke-width="2"/>`).join('')}
+  <text x="2" y="${(y(Math.max(...ys))-6).toFixed(1)}" font-size="10" fill="#937a8c">${Math.max(...ys)}</text><text x="2" y="${(y(Math.min(...ys))+14).toFixed(1)}" font-size="10" fill="#937a8c">${Math.min(...ys)}</text></svg>
+  <div class="row between small mute" style="margin-top:6px"><span>${fmt(pts[0].date)}</span><b style="color:var(--rose-d)">${diff>0?'+':''}${diff} ${f[2]}</b><span>${fmt(pts[pts.length-1].date)}</span></div>`;
+}
+
+function vVoz(){
+  let h=head('Voz','Entrenamiento');
+  const ws=weekStart(),wk=S.voiceLog.filter(l=>l.date>=ws).reduce((a,l)=>a+l.mins,0);
+  h+=`<div class="card"><h2>Afinador</h2><div class="row between" style="align-items:flex-end"><div><span class="big" id="hz">–</span> <span class="mute">Hz</span></div><div id="hzl" class="tag" style="font-size:13px">${mic?'Habla…':'Parado'}</div></div>
+  <div class="meter"><i style="width:${(65/220*100).toFixed(1)}%;background:#e6dde2"></i><i style="width:${(20/220*100).toFixed(1)}%;background:#d8c8ec"></i><i style="width:${(90/220*100).toFixed(1)}%;background:linear-gradient(90deg,#efb5c8,#c4577e)"></i><i style="width:${(45/220*100).toFixed(1)}%;background:#e9c9d6"></i><span class="marker" id="hzm"></span></div>
+  <div class="row between small mute"><span>80</span><span>145</span><span>165</span><span>255</span><span>300</span></div>
+  <p class="small mute" style="margin:10px 0 12px">La franja rosa (165–255 Hz) es el tono típico de voz femenina. El tono es solo una parte: la resonancia y la entonación cuentan igual o más.</p>
+  <button class="btn block ${mic?'soft':''}" data-act="mic" id="micBtn">${mic?'■ Parar':'● Empezar a escuchar'}</button></div>`;
+  h+=`<div class="card"><div class="stat"><div><b>${wk}</b><span>min esta semana</span></div><div><b>${S.voiceLog.length}</b><span>sesiones</span></div><div><b>${S.recs.length}</b><span>grabaciones</span></div></div></div>`;
+  h+=`<div class="card"><h2>Ejercicios <button class="btn sm ghost" data-act="editEx">＋</button></h2>${S.voiceEx.map(e=>`<div class="li"><div class="grow"><b>${esc(e.name)}</b><div class="mute small">${e.mins} min${e.tip?' · '+esc(e.tip):''}</div></div><button class="btn sm" data-act="startEx" data-id="${e.id}">▶</button><button class="x" data-act="editEx" data-id="${e.id}">✎</button></div>`).join('')||'<div class="empty">Sin ejercicios</div>'}</div>`;
+  h+=`<div class="card"><h2>Grabaciones</h2><button class="btn block ${rec?'danger':''}" data-act="rec">${rec?'<span class="recdot"></span>Grabando… toca para parar':'🎙️ Grabar mi voz'}</button>
+  <p class="small mute" style="margin:10px 0 4px">Graba la misma frase cada semana para comparar tu evolución.</p>
+  ${S.recs.map(r=>`<div class="li" style="flex-wrap:wrap"><div class="grow"><b>${fmt(r.date)}</b> <span class="mute small">${r.time||''}${r.dur?' · '+r.dur+'s':''}</span><audio controls preload="none" data-media="${r.media}"></audio></div><button class="x" data-act="delRec" data-id="${r.id}">✕</button></div>`).join('')}</div>`;
+  return h;
+}
+
+function vMas(){
+  let h=head('Más','Todo lo tuyo');
+  const T=[['armario','👗','Armario',`${S.wardrobe.length} prendas`],['salud','💊','Salud','Medicación y citas'],['intimo','🔒','Íntimo',`${S.intimate.length} tareas`],['retos','🌟','Retos',`${S.retosLog.length} conseguidos`],['ajustes','⚙️','Ajustes','Etapa, secciones, PIN']].filter(t=>!SECS.some(s=>s[0]===t[0])||secOn(t[0]));
+  const bot=S.settings.botUrl;
+  h+=`<div class="tiles"><button class="tile" data-act="go" data-v="ia"><div class="e">✨</div><b>Valeria IA</b><span>${hasAI()?'Chat dentro de Lumi':'Configurar IA'}</span></button>${bot?`<a class="tile" href="${esc(bot)}" target="_blank" rel="noopener noreferrer" style="text-decoration:none"><div class="e">💬</div><b>Chatbot</b><span>Hablar con tu asistente ↗</span></a>`:`<button class="tile" data-act="setBot"><div class="e">💬</div><b>Chatbot</b><span>Configurar</span></button>`}${T.map(t=>`<button class="tile" data-act="go" data-v="${t[0]}"><div class="e">${t[1]}</div><b>${t[2]}</b><span>${t[3]}</span></button>`).join('')}</div>`;
+  return h;
+}
+
+const WTYPES=['Vestido','Falda','Top / blusa','Pantalón','Lencería','Medias','Zapatos','Accesorio','Maquillaje','Peluca','Cuidado de piel','Otro'];
+const WICON={'Vestido':'👗','Falda':'🩰','Top / blusa':'👚','Pantalón':'👖','Lencería':'🩱','Medias':'🧦','Zapatos':'👠','Accesorio':'👜','Maquillaje':'💄','Peluca':'💇','Cuidado de piel':'🧴','Otro':'✨'};
+function vArmario(){
+  let h=head('Armario','Tu estilo','mas');
+  const tiene=S.wardrobe.filter(w=>w.status!=='quiero').length,quiere=S.wardrobe.length-tiene;
+  h+=`<div class="chips"><button class="chip ${wf==='todo'?'on':''}" data-act="wf" data-f="todo">Todo (${S.wardrobe.length})</button><button class="chip ${wf==='tengo'?'on':''}" data-act="wf" data-f="tengo">Lo tengo (${tiene})</button><button class="chip ${wf==='quiero'?'on':''}" data-act="wf" data-f="quiero">Lo quiero (${quiere})</button></div>`;
+  h+=`<button class="btn block" style="margin-bottom:14px" data-act="editWard">＋ Añadir</button>`;
+  const ls=S.wardrobe.filter(w=>wf==='todo'||(wf==='quiero'?w.status==='quiero':w.status!=='quiero'));
+  h+=ls.length?`<div class="ward">${ls.map(w=>`<button class="witem" data-act="editWard" data-id="${w.id}"><div class="ph">${w.photo?`<img data-media="${w.photo}" alt="">`:(WICON[w.type]||'✨')}</div><div class="in"><b>${esc(w.name)}</b><span class="mute small">${esc(w.type)}${w.size?' · T. '+esc(w.size):''}</span><br><span class="tag ${w.status==='quiero'?'l':''}">${w.status==='quiero'?'Lo quiero':'Lo tengo'}${w.price?' · '+esc(w.price)+' €':''}</span></div></button>`).join('')}</div>`:`<div class="card empty">${!S.wardrobe.length?'Aún no tienes ropa, ¡es normal! Empieza tu <b>lista de deseos</b>: añade lo que te gustaría tener como "Lo quiero" y márcalo como "Lo tengo" cuando lo consigas.':'Nada en este filtro.'}</div>`;
+  return h;
+}
+
+function vSalud(){
+  let h=head('Salud','Tu registro','mas');
+  h+=`<div class="warn" style="background:#f6f0fb;border-color:#e2d6f1;color:#5b4483">Esto es solo un registro para ti. Las dosis y cualquier cambio, siempre con tu médico o endocrino.</div>`;
+  h+=`<div class="card"><h2>Medicación <button class="btn sm ghost" data-act="editMed">＋</button></h2>${S.meds.map(m=>`<div class="li"><span style="font-size:20px">💊</span><div class="grow"><b>${esc(m.name)}</b><div class="mute small">${esc(m.dose)}${m.time?' · '+esc(m.time):''}${m.since?' · desde '+fmt(m.since):''}</div></div><button class="x" data-act="editMed" data-id="${m.id}">✎</button><button class="x" data-act="delMed" data-id="${m.id}">✕</button></div>`).join('')||'<div class="empty">Nada apuntado</div>'}</div>`;
+  const days=daysBack(14);
+  if(S.meds.length)h+=`<div class="card"><h2>Tomas · 14 días</h2><div class="week" style="grid-template-columns:repeat(14,1fr);gap:3px">${days.map(d=>{const c=(S.medLog[d]||[]).length,p=c/S.meds.length;return `<div><i style="width:100%;height:22px;border-radius:6px;margin:0;background:${p?`rgba(139,107,191,${.2+Math.min(1,p)*.8})`:''}"></i></div>`}).join('')}</div><div class="mute small" style="margin-top:8px">Marca las tomas cada día desde la pantalla Hoy.</div></div>`;
+  const t=ymd(),ap=[...S.appts].sort((a,b)=>a.date<b.date?-1:1);
+  h+=`<div class="card"><h2>Citas <button class="btn sm ghost" data-act="editAppt">＋</button></h2>${ap.map(a=>`<div class="li" style="${a.date<t?'opacity:.5':''}"><span style="font-size:20px">📅</span><div class="grow"><b>${esc(a.text)}</b><div class="mute small">${fmt(a.date)}</div></div><button class="x" data-act="delAppt" data-id="${a.id}">✕</button></div>`).join('')||'<div class="empty">Sin citas</div>'}</div>`;
+  const lb=[...S.labs].sort((a,b)=>a.date<b.date?1:-1);
+  h+=`<div class="card"><h2>Analíticas <button class="btn sm ghost" data-act="editLab">＋</button></h2>${lb.map(l=>`<div class="li"><div class="grow"><b>${esc(l.name)}: ${esc(l.value)} ${esc(l.unit)}</b><div class="mute small">${fmt(l.date)}${l.note?' · '+esc(l.note):''}</div></div><button class="x" data-act="delLab" data-id="${l.id}">✕</button></div>`).join('')||'<div class="empty">Apunta aquí los valores de tus analíticas para ver cómo cambian.</div>'}</div>`;
+  return h;
+}
+
+const FL=['','🔥','🔥🔥','🔥🔥🔥'];
+function vIntimo(){
+  let h=head('Íntimo','Solo para ti','mas');
+  if(!S.settings.pin)h+=`<div class="warn">🔒 Te recomiendo poner un PIN en <b>Ajustes</b> para que nadie vea esta sección si coge tu móvil.</div>`;
+  const pool=S.intimate.filter(i=>!ilvl||i.lvl===ilvl);
+  h+=`<div class="card"><h2>Sacar una tarea</h2><div class="chips">${[0,1,2,3].map(l=>`<button class="chip ${ilvl===l?'on':''}" data-act="ilvl" data-l="${l}">${l?FL[l]:'Todas'}</button>`).join('')}</div>
+  ${drawn?`<div class="drawn">${esc(drawn.text)}<div style="font-size:14px;margin-top:8px">${FL[drawn.lvl]||''}</div></div><div class="row"><button class="btn block" data-act="intDone">✓ Hecha</button><button class="btn ghost block" data-act="drawInt">Otra</button></div>`:`<button class="btn block" data-act="drawInt" ${pool.length?'':'disabled style="opacity:.5"'}>🎲 Sacar al azar (${pool.length})</button>`}</div>`;
+  h+=`<div class="card"><h2>Mis tareas <button class="btn sm" data-act="editInt">＋</button></h2><p class="small mute" style="margin:0 0 10px">Escribe aquí tus propias tareas y retos. Se guardan solo en este dispositivo.</p>${S.intimate.map(i=>`<div class="li"><div class="grow">${esc(i.text)}<div class="small">${FL[i.lvl]||''}</div></div><button class="x" data-act="editInt" data-id="${i.id}">✎</button><button class="x" data-act="delInt" data-id="${i.id}">✕</button></div>`).join('')||'<div class="empty">Todavía no has escrito ninguna.</div>'}</div>`;
+  if(S.intimateLog.length)h+=`<div class="card"><h2>Hechas <button class="btn sm soft" data-act="clearIntLog">Borrar historial</button></h2>${S.intimateLog.slice(-15).reverse().map(l=>`<div class="li"><div class="grow small">${esc(l.text)}</div><span class="mute small">${fmt(l.date)}</span></div>`).join('')}</div>`;
+  return h;
+}
+
+function vChat(){
+  const u=S.settings.botUrl;if(!u)return head('Chatbot','Tu asistente','mas')+'<div class="card empty">Configura tu chatbot en Ajustes.</div>';
+  return head('Chatbot','Tu asistente','mas')+`<a class="btn ghost block" style="text-align:center;text-decoration:none;margin-bottom:12px" href="${esc(u)}" target="_blank" rel="noopener noreferrer">↗ Abrir en otra pestaña</a>
+`;
+}
+function vIA(){
+  let h=head('Valeria ✨','Tu asistente con IA','mas');
+  if(!hasAI())return h+`<div class="card"><p style="margin-top:0">Para usar el chat con IA necesitas poner tu clave de OpenRouter.</p><button class="btn block" data-act="go" data-v="ajustes">Ir a Ajustes</button></div>`;
+  const ms=S.aiChat||[];
+  h+=`<div class="card">${ms.length?ms.map(m=>`<div class="msg ${m.role==='user'?'u':'a'}">${esc(m.content)}</div>`).join(''):`<div class="msg a">¡Hola${S.settings.name?', '+esc(S.settings.name):''}! 💕 Pregúntame lo que quieras: tallas, maquillaje, piel, voz, ropa para tu cuerpo… ¿Por dónde empezamos?</div>`}${aiBusy?'<div class="msg a t">Escribiendo…</div>':''}</div>
+  <div class="row" style="align-items:flex-end"><textarea id="aiIn" style="min-height:52px;height:52px" placeholder="Escribe tu pregunta…"></textarea><button class="btn" data-act="aiSend" ${aiBusy?'disabled':''}>➤</button></div>
+  ${ms.length?'<button class="btn sm soft" style="margin-top:12px" data-act="aiClear">Borrar conversación</button>':''}`;
+  return h;
+}
+function vRetos(){
+  let h=head('Retos','Pequeños pasos','mas');
+  const st=STAGES[S.stage],hechos=S.retosLog.map(l=>l.text);
+  if(st)h+=`<div class="card"><h2>Etapa ${S.stage}: ${st.n} ${st.e} <button class="btn sm ghost" data-act="pickStage">Cambiar</button></h2>${st.r.map(r=>`<div class="li"><span>${hechos.includes(r)?'🌟':'○'}</span><div class="grow small" style="${hechos.includes(r)?'color:var(--mute)':''}">${esc(r)}</div></div>`).join('')}</div>`;
+  h+=`<div class="card"><h2>Mis retos <button class="btn sm" data-act="editReto">＋</button></h2><p class="small mute" style="margin:0 0 10px">Añade los tuyos. Cada día te sale uno al azar en Hoy, mezclado con los de tu etapa.</p>${S.retos.map((r,i)=>`<div class="li"><div class="grow">${esc(r)}</div><button class="x" data-act="editReto" data-i="${i}">✎</button><button class="x" data-act="delReto" data-i="${i}">✕</button></div>`).join('')||'<div class="empty">Sin retos</div>'}</div>`;
+  if(S.retosLog.length)h+=`<div class="card"><h2>Conseguidos</h2>${S.retosLog.slice(-20).reverse().map(l=>`<div class="li"><span>🌟</span><div class="grow small">${esc(l.text)}</div><span class="mute small">${fmt(l.date)}</span></div>`).join('')}</div>`;
+  return h;
+}
+
+function vAjustes(){
+  let h=head('Ajustes','Privacidad y copias','mas');
+  h+=`<div class="card"><h2>Tu nombre</h2><input id="setName" placeholder="¿Cómo quieres que te llame?" value="${esc(S.settings.name)}" data-chg="name">${nameUI('setName')}</div>`;
+  const st=STAGES[S.stage];
+  h+=`<div class="card"><h2>Mi etapa</h2><div class="li"><div class="grow"><b>${st?st.e+' '+st.n:'Sin elegir'}</b><div class="mute small">${st?st.d:''}</div></div><button class="btn sm" data-act="pickStage">Cambiar</button></div></div>`;
+  h+=`<div class="card"><h2>Secciones</h2><p class="small mute" style="margin:0 0 6px">Enciende solo lo que te sirva ahora. Puedes activar el resto cuando quieras; no se borra nada.</p>${SECS.map(s=>`<div class="li"><span style="font-size:20px">${s[1]}</span><div class="grow">${s[2]}</div><button class="sw ${secOn(s[0])?'on':''}" data-act="togSec" data-k="${s[0]}"></button></div>`).join('')}</div>`;
+  h+=`<div class="card"><h2>Inteligencia artificial</h2><p class="small mute" style="margin:0 0 6px">Con una clave de <b>OpenRouter</b> (gratis, con límite de unas 50 peticiones al día) Lumi te escribe un mensaje distinto cada día, inventa retos nuevos y tienes a Valeria para preguntarle dentro de la app.</p>
+  <label class="f">Clave de API</label><input id="aiKey" type="password" autocomplete="off" placeholder="sk-or-…" value="${esc(S.settings.aiKey||'')}">
+  <label class="f">Modelo</label><input id="aiModel" placeholder="openrouter/free" value="${esc(S.settings.aiModel||'')}">
+  <p class="small mute">Déjalo vacío para usar los modelos gratuitos. Lo que mandes a la IA sale del móvil hacia OpenRouter; el resto de Lumi sigue siendo local. La clave se guarda solo aquí y no va en las copias de seguridad.</p>
+  <div class="row"><button class="btn block" data-act="saveAI">Guardar y probar</button>${S.settings.aiKey?'<button class="btn soft" data-act="delAI">Quitar</button>':''}</div></div>`;
+  h+=`<div class="card"><h2>Chatbot</h2><div class="li"><span style="font-size:20px">💬</span><div class="grow"><b>${S.settings.botUrl?esc(S.settings.botUrl.replace(/^https?:\/\//,'')):'Sin configurar'}</b><div class="mute small">Acceso directo desde Más</div></div><button class="btn sm" data-act="setBot">${S.settings.botUrl?'Cambiar':'Poner'}</button></div></div>`;
+  h+=`<div class="card"><h2>Privacidad</h2>
+  <div class="li"><div class="grow"><b>PIN de bloqueo</b><div class="mute small">${S.settings.pin?'Activado. Se bloquea al salir más de 1 minuto.':'Desactivado'}</div></div>${S.settings.pin?'<button class="btn sm soft" data-act="delPin">Quitar</button>':''}<button class="btn sm" data-act="setPin">${S.settings.pin?'Cambiar':'Poner'}</button></div>
+  <div class="li"><div class="grow"><b>Modo discreto</b><div class="mute small">La pestaña se llama "Notas" en vez de "Lumi"</div></div><button class="sw ${S.settings.discreet?'on':''}" data-act="discreet"></button></div>
+  <p class="small mute" style="margin:12px 0 0">Todo se guarda solo en este navegador, en este dispositivo. No se envía nada a ningún sitio y funciona sin internet. El PIN es una cortina para miradas curiosas, no un cifrado.</p></div>`;
+  h+=`<div class="card"><h2>Copias de seguridad</h2><p class="small mute" style="margin:0 0 12px">Si borras los datos del navegador (o tienes activado en Brave "borrar datos al salir"), se pierde todo. Haz una copia de vez en cuando y guárdala donde quieras.</p>
+  <div class="row"><button class="btn block" data-act="export">⬇ Exportar copia</button><button class="btn ghost block" data-act="import">⬆ Importar</button></div></div>`;
+  h+=`<div class="card"><h2>Zona peligrosa</h2><button class="btn danger block" data-act="wipe">Borrar todos los datos</button></div>`;
+  return h;
+}
+
+/* ================= Voz: afinador y grabación ================= */
+let mic=null,rec=null,timer=null,exT0=0;
+function pitch(buf,sr){
+  let n=buf.length,rms=0;for(let i=0;i<n;i++)rms+=buf[i]*buf[i];rms=Math.sqrt(rms/n);if(rms<0.012)return -1;
+  let r1=0,r2=n-1;const th=0.2;
+  for(let i=0;i<n/2;i++)if(Math.abs(buf[i])<th){r1=i;break}
+  for(let i=1;i<n/2;i++)if(Math.abs(buf[n-i])<th){r2=n-i;break}
+  const b=buf.slice(r1,r2);n=b.length;const maxLag=Math.min(n-1,Math.floor(sr/60));const c=new Float32Array(maxLag+1);
+  for(let i=0;i<=maxLag;i++){let s=0;for(let j=0;j<n-i;j++)s+=b[j]*b[j+i];c[i]=s}
+  let d=0;while(d<maxLag&&c[d]>c[d+1])d++;
+  let mx=-1,mp=-1;for(let i=d;i<=maxLag;i++)if(c[i]>mx){mx=c[i];mp=i}
+  let T0=mp;if(T0<=0||T0>=maxLag)return -1;
+  const x1=c[T0-1],x2=c[T0],x3=c[T0+1],a=(x1+x3-2*x2)/2,bb=(x3-x1)/2;if(a)T0=T0-bb/(2*a);
+  return sr/T0;
+}
+async function startMic(){
+  try{
+    const st=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:true}});
+    const ac=new (window.AudioContext||window.webkitAudioContext)();const an=ac.createAnalyser();an.fftSize=2048;ac.createMediaStreamSource(st).connect(an);
+    const buf=new Float32Array(an.fftSize);let sm=0;mic={st,ac,samples:[],iv:0};
+    mic.iv=setInterval(()=>{
+      an.getFloatTimeDomainData(buf);const f=pitch(buf,ac.sampleRate);const el=$('#hz'),lb=$('#hzl'),mk=$('#hzm');if(!el)return;
+      if(f>70&&f<450){sm=sm?sm*.7+f*.3:f;mic.samples.push(sm);el.textContent=Math.round(sm);
+        const p=Math.max(0,Math.min(1,(sm-80)/220));mk.style.display='block';mk.style.left=`calc(${(p*100).toFixed(1)}% - 2px)`;
+        lb.textContent=sm<145?'Grave':sm<165?'Andrógina':sm<=255?'Femenina ✨':'Aguda';}
+      else{sm=0;lb.textContent='Habla…'}
+    },70);
+    render();
+  }catch(e){toast('No hay acceso al micrófono')}
+}
+function stopMic(){
+  if(!mic)return;clearInterval(mic.iv);mic.st.getTracks().forEach(t=>t.stop());try{mic.ac.close()}catch(e){}
+  const s=mic.samples;mic=null;
+  if(s.length>20){const avg=Math.round(s.reduce((a,b)=>a+b,0)/s.length);toast(`Tono medio: ${avg} Hz`)}
+  if(view==='voz')render();
+}
+async function toggleRec(){
+  if(rec){rec.mr.stop();return}
+  try{
+    const st=await navigator.mediaDevices.getUserMedia({audio:true});const mr=new MediaRecorder(st);const ch=[];
+    mr.ondataavailable=e=>{if(e.data.size)ch.push(e.data)};
+    mr.onstop=async()=>{st.getTracks().forEach(t=>t.stop());const dur=Math.round((Date.now()-rec.t0)/1000);rec=null;
+      if(ch.length){const blob=new Blob(ch,{type:mr.mimeType||'audio/webm'});const id=await putMedia(blob);const n=new Date();S.recs.unshift({id:uid(),date:ymd(),time:pad2(n.getHours())+':'+pad2(n.getMinutes()),media:id,dur});save();toast('Grabación guardada')}
+      render()};
+    mr.start();rec={mr,t0:Date.now()};render();
+  }catch(e){toast('No se puede grabar en este navegador')}
+}
+
+/* ================= Bloqueo PIN ================= */
+function hashPin(p){let h=5381;for(const ch of 'lumi:'+p)h=(((h<<5)+h)+ch.charCodeAt(0))>>>0;let h2=52711;for(const ch of p+':imul')h2=(Math.imul(h2^ch.charCodeAt(0),2654435761))>>>0;return h.toString(36)+h2.toString(36)}
+let pinBuf='';
+function showLock(){pinBuf='';drawDots();$('#lock').classList.remove('hidden');closeSheet();stopMic()}
+function drawDots(){document.querySelectorAll('#dots i').forEach((d,i)=>d.classList.toggle('on',i<pinBuf.length))}
+let hiddenAt=0;
+document.addEventListener('visibilitychange',()=>{if(document.hidden){hiddenAt=Date.now();stopMic()}else if(S.settings.pin&&hiddenAt&&Date.now()-hiddenAt>60000)showLock()});
+
+/* ================= Acciones ================= */
+const ACT={
+  go:el=>go(el.dataset.v),
+  close:()=>closeSheet(),
+  toggleR:el=>{const id=el.dataset.id,r=S.routines.find(x=>x.id===id),t=ymd();
+    if(r.freq==='semanal'&&isDone(r)){const ws=weekStart();Object.keys(S.checks).forEach(d=>{if(d>=ws)S.checks[d]=S.checks[d].filter(x=>x!==id)})}
+    else{const a=S.checks[t]||(S.checks[t]=[]);const k=a.indexOf(id);k<0?a.push(id):a.splice(k,1)}
+    save();render()},
+  toggleM:el=>{const t=ymd(),a=S.medLog[t]||(S.medLog[t]=[]),k=a.indexOf(el.dataset.id);k<0?a.push(el.dataset.id):a.splice(k,1);save();render()},
+  retoDone:()=>{const rp=S.retoPick;rp.done=true;S.retosLog.push({date:ymd(),text:rp.text,stage:S.stage});save();toast('¡Bien hecho! 🌟');render()},
+  retoOtro:()=>{const hechos=S.retosLog.map(l=>l.text);let pool=retoPool().filter(r=>r!==S.retoPick.text&&!hechos.includes(r));if(!pool.length)pool=retoPool().filter(r=>r!==S.retoPick.text);if(!pool.length)return;
+    S.retoPick={date:ymd(),text:pool[Math.floor(Math.random()*pool.length)],done:false,stage:S.stage};save();render()},
+  setStage:el=>{S.stage=+el.dataset.s;S.retoPick=null;save();closeSheet();render();toast(`Etapa: ${STAGES[S.stage].n} ${STAGES[S.stage].e}`)},
+  nextStage:()=>{if(S.stage<4){S.stage++;S.retoPick=null;save();render();toast(`¡Nueva etapa: ${STAGES[S.stage].n}! ${STAGES[S.stage].e}`)}},
+  setBot:()=>{sheet(`<h3>Tu chatbot 💬</h3><label class="f">Dirección web</label><input id="bUrl" type="url" inputmode="url" placeholder="https://crushon.ai" value="${esc(S.settings.botUrl||'')}">
+    <p class="small mute">Se abre en otra pestaña. Lumi no le envía nada; lo que hables allí lo guarda esa web, no este móvil.</p>
+    <div class="actions">${S.settings.botUrl?'<button class="btn danger" data-act="delBot">Quitar</button>':'<button class="btn soft" data-act="close">Cancelar</button>'}<button class="btn" data-act="saveBot">Guardar</button></div>`)},
+  saveBot:()=>{let u=fv('bUrl');if(!u)return toast('Pon la dirección');if(!/^https?:\/\//i.test(u))u='https://'+u;S.settings.botUrl=u;save();closeSheet();render();toast('Chatbot guardado ✓')},
+  delBot:()=>{S.settings.botUrl='';save();closeSheet();render()},
+  retoAI:async el=>{if(el.disabled)return;el.disabled=true;el.textContent='Pensando…';
+    try{const hechos=S.retosLog.slice(-15).map(l=>l.text).join(' | ');
+      const t=await ai([{role:'system',content:AI_SYS},{role:'user',content:aiCtx()+`\n\nInventa UN reto nuevo para hoy, adecuado a su etapa, concreto y que se pueda hacer hoy en casa o a su ritmo. Distinto de estos: ${hechos||'(ninguno)'}. Máximo 20 palabras. Responde solo con el texto del reto, sin comillas ni explicaciones.`}],120,1);
+      const txt=t.split('\n').map(x=>x.trim()).filter(Boolean)[0]||'';if(!txt)throw new Error('La IA no ha respondido, prueba otra vez');
+      S.retoPick={date:ymd(),text:txt.replace(/^["“'*\-\s]+|["”'*\s]+$/g,''),done:false,stage:S.stage,ai:true};save();render()}
+    catch(e){toast(e.message||'No se pudo conectar');render()}},
+  aiSend:async()=>{const q=fv('aiIn');if(!q||aiBusy)return;S.aiChat=S.aiChat||[];S.aiChat.push({role:'user',content:q});aiBusy=true;save();render();
+    try{const t=await ai([{role:'system',content:AI_SYS+'\n\n'+aiCtx()},...S.aiChat.slice(-20)],900,.8);S.aiChat.push({role:'assistant',content:t||'(sin respuesta, prueba otra vez)'})}
+    catch(e){S.aiChat.push({role:'assistant',content:'⚠️ '+(e.message||'No se pudo conectar')})}
+    S.aiChat=S.aiChat.slice(-40);aiBusy=false;save();if(view==='ia')render()},
+  aiClear:()=>{if(!confirm('¿Borrar la conversación?'))return;S.aiChat=[];save();render()},
+  saveAI:async el=>{const k=fv('aiKey');if(!k)return toast('Pega tu clave');S.settings.aiKey=k;S.settings.aiModel=fv('aiModel');S.aiTip=null;save();el.textContent='Probando…';el.disabled=true;
+    try{const t=await ai([{role:'user',content:'Responde solo con la palabra: OK'}],20,0);toast(t?'¡Conectada y respondiendo! ✨':'Clave válida ✓ (el modelo no respondió, prueba en el chat)')}catch(e){toast('⚠️ '+e.message)}render()},
+  delAI:()=>{S.settings.aiKey='';S.aiTip=null;save();render()},
+  sugName:el=>{const box=document.getElementById(el.dataset.box);const pick=[...NAMES].sort(()=>Math.random()-.5).slice(0,8);
+    box.innerHTML=pick.map(n=>`<button class="chip" data-act="useName" data-n="${n}" data-in="${el.dataset.in}">${n}</button>`).join('');el.textContent='🎲 Otros nombres'},
+  useName:el=>{const i=document.getElementById(el.dataset.in);i.value=el.dataset.n;el.parentNode.querySelectorAll('.chip').forEach(c=>c.classList.toggle('on',c===el));
+    if(el.dataset.in==='setName'){S.settings.name=el.dataset.n;save();toast(`Encantada, ${el.dataset.n} 💕`)}},
+  pickStage:()=>{sheet(`<h3>¿En qué punto estás?</h3><p class="small mute" style="margin-top:-4px">Puedes cambiarlo cuando quieras, hacia delante o hacia atrás.</p>${stageOpts('setStage')}<button class="btn soft block" style="margin-top:10px" data-act="close">Cerrar</button>`)},
+  togSec:el=>{const k=el.dataset.k;S.sec[k]=!secOn(k);save();if(el.closest('#sheetCard'))el.classList.toggle('on',secOn(k));else render();renderNav()},
+  startApp:()=>{const n=fv('obName');if(n)S.settings.name=n;if(!S.stage)return toast('Elige en qué punto estás');save();closeSheet();render()},
+  obStage:el=>{S.stage=+el.dataset.s;el.parentNode.querySelectorAll('.chk').forEach(b=>b.classList.toggle('sel',b===el))},
+  /* Diario */
+  dseg:el=>{dseg=el.dataset.s;render()},
+  metric:el=>{metric=el.dataset.m;render()},
+  newEntry:el=>{const e=S.journal.find(x=>x.id===el.dataset.id)||{};
+    sheet(`<h3>${e.id?'Editar entrada':'Nueva entrada'}</h3><label class="f">Fecha</label><input type="date" id="eDate" value="${e.date||ymd()}">
+    <label class="f">¿Cómo te sientes?</label><div class="moods" id="eMood">${MOODS.map(m=>`<button data-act="mood" data-m="${m}" class="${e.mood===m?'on':''}">${m}</button>`).join('')}</div>
+    <label class="f">Notas</label><textarea id="eText" placeholder="Qué has hecho hoy, qué has probado, cómo te has visto…">${esc(e.text||'')}</textarea>
+    <label class="f">Foto ${e.photo?'(ya tiene una; elige otra para cambiarla)':''}</label><input type="file" id="ePhoto" accept="image/*">
+    <div class="actions"><button class="btn soft" data-act="close">Cancelar</button><button class="btn" data-act="saveEntry" data-id="${e.id||''}">Guardar</button></div>`)},
+  mood:el=>{el.parentNode.querySelectorAll('button').forEach(b=>b.classList.remove('on'));el.classList.add('on')},
+  saveEntry:async el=>{const old=S.journal.find(x=>x.id===el.dataset.id);const m=document.querySelector('#eMood .on');
+    const ph=await photoFrom('ePhoto');const e={id:old?old.id:uid(),ts:old?old.ts:Date.now(),date:fv('eDate')||ymd(),mood:m?m.dataset.m:'',text:fv('eText'),photo:ph||(old&&old.photo)||''};
+    if(ph&&old&&old.photo)delMedia(old.photo);
+    if(!e.text&&!e.photo&&!e.mood)return toast('Escribe algo o añade una foto');
+    if(old)Object.assign(old,e);else S.journal.push(e);save();closeSheet();if(view!=='diario'){view='diario';dseg='entradas'}render();toast('Guardado ✓')},
+  delEntry:el=>{if(!confirm('¿Borrar esta entrada?'))return;const e=S.journal.find(x=>x.id===el.dataset.id);delMedia(e.photo);S.journal=S.journal.filter(x=>x!==e);save();render()},
+  newMeasure:()=>{sheet(`<h3>Nuevas medidas</h3><label class="f">Fecha</label><input type="date" id="mDate" value="${ymd()}"><div class="grid2">${MF.map(f=>`<div><label class="f">${f[1]} (${f[2]})</label><input type="number" step="0.1" inputmode="decimal" id="m_${f[0]}"></div>`).join('')}</div>
+    <p class="small mute">Rellena solo las que quieras. Mide siempre a la misma hora y de la misma forma.</p>
+    <div class="actions"><button class="btn soft" data-act="close">Cancelar</button><button class="btn" data-act="saveMeasure">Guardar</button></div>`)},
+  saveMeasure:()=>{const m={id:uid(),date:fv('mDate')||ymd()};let any=false;MF.forEach(f=>{const v=fv('m_'+f[0]).replace(',','.');if(v!==''&&!isNaN(v)){m[f[0]]=+v;any=true}});
+    if(!any)return toast('Pon al menos una medida');S.measures.push(m);save();closeSheet();view='diario';dseg='medidas';render();toast('Medidas guardadas ✓')},
+  delMeasure:el=>{if(!confirm('¿Borrar este registro?'))return;S.measures=S.measures.filter(x=>x.id!==el.dataset.id);save();render()},
+  /* Rutinas */
+  editRoutine:el=>{const r=S.routines.find(x=>x.id===el.dataset.id)||{icon:'✨',freq:'diaria'};
+    sheet(`<h3>${r.id?'Editar rutina':'Nueva rutina'}</h3><div class="grid2" style="grid-template-columns:80px 1fr"><div><label class="f">Icono</label><input id="rIcon" value="${esc(r.icon)}" maxlength="4" style="text-align:center;font-size:22px"></div><div><label class="f">Nombre</label><input id="rName" value="${esc(r.name||'')}" placeholder="Ej: Exfoliante"></div></div>
+    <label class="f">Frecuencia</label><select id="rFreq"><option value="diaria" ${r.freq==='diaria'?'selected':''}>Diaria</option><option value="semanal" ${r.freq==='semanal'?'selected':''}>Semanal</option></select>
+    <div class="actions"><button class="btn soft" data-act="close">Cancelar</button><button class="btn" data-act="saveRoutine" data-id="${r.id||''}">Guardar</button></div>`)},
+  saveRoutine:el=>{const name=fv('rName');if(!name)return toast('Ponle un nombre');const d={icon:fv('rIcon')||'✨',name,freq:fv('rFreq')};const r=S.routines.find(x=>x.id===el.dataset.id);
+    if(r)Object.assign(r,d);else S.routines.push({id:uid(),...d});save();closeSheet();render()},
+  delRoutine:el=>{if(!confirm('¿Borrar esta rutina?'))return;S.routines=S.routines.filter(x=>x.id!==el.dataset.id);save();render()},
+  /* Voz */
+  mic:()=>mic?stopMic():startMic(),
+  rec:()=>toggleRec(),
+  delRec:el=>{if(!confirm('¿Borrar esta grabación?'))return;const r=S.recs.find(x=>x.id===el.dataset.id);delMedia(r.media);S.recs=S.recs.filter(x=>x!==r);save();render()},
+  startEx:el=>{const ex=S.voiceEx.find(e=>e.id===el.dataset.id);stopMic();exT0=Date.now();
+    sheet(`<h3>${esc(ex.name)}</h3><div class="big" id="cd" style="text-align:center;margin:26px 0 12px">${mmss(ex.mins*60)}</div><p class="mute" style="text-align:center">${esc(ex.tip||'')}</p>
+    <div class="actions"><button class="btn soft" data-act="close">Cancelar</button><button class="btn" data-act="endEx" data-id="${ex.id}">Terminar y guardar</button></div>`);
+    timer=setInterval(()=>{const r=Math.max(0,ex.mins*60-Math.floor((Date.now()-exT0)/1000));const c=$('#cd');if(!c)return;c.textContent=r?mmss(r):'¡Hecho! ✨';if(!r){clearInterval(timer);timer=null;if(navigator.vibrate)navigator.vibrate([200,100,200])}},500)},
+  endEx:el=>{const mins=Math.max(1,Math.round((Date.now()-exT0)/60000));S.voiceLog.push({date:ymd(),ex:el.dataset.id,mins});
+    const vr=S.routines.find(r=>/voz/i.test(r.name)&&r.freq!=='semanal');if(vr){const a=S.checks[ymd()]||(S.checks[ymd()]=[]);if(!a.includes(vr.id))a.push(vr.id)}
+    save();closeSheet();toast(`+${mins} min de voz 🎤`);render()},
+  editEx:el=>{const e=S.voiceEx.find(x=>x.id===el.dataset.id)||{mins:5};
+    sheet(`<h3>${e.id?'Editar ejercicio':'Nuevo ejercicio'}</h3><label class="f">Nombre</label><input id="xName" value="${esc(e.name||'')}"><label class="f">Minutos</label><input type="number" id="xMins" inputmode="numeric" value="${e.mins}"><label class="f">Consejo</label><textarea id="xTip" style="min-height:70px">${esc(e.tip||'')}</textarea>
+    <div class="actions">${e.id?`<button class="btn danger" data-act="delEx" data-id="${e.id}">Borrar</button>`:'<button class="btn soft" data-act="close">Cancelar</button>'}<button class="btn" data-act="saveEx" data-id="${e.id||''}">Guardar</button></div>`)},
+  saveEx:el=>{const name=fv('xName');if(!name)return toast('Ponle un nombre');const d={name,mins:Math.max(1,parseInt(fv('xMins'))||5),tip:fv('xTip')};const e=S.voiceEx.find(x=>x.id===el.dataset.id);
+    if(e)Object.assign(e,d);else S.voiceEx.push({id:uid(),...d});save();closeSheet();render()},
+  delEx:el=>{S.voiceEx=S.voiceEx.filter(x=>x.id!==el.dataset.id);save();closeSheet();render()},
+  /* Armario */
+  wf:el=>{wf=el.dataset.f;render()},
+  editWard:el=>{const w=S.wardrobe.find(x=>x.id===el.dataset.id)||{type:'Vestido',status:'tengo'};
+    sheet(`<h3>${w.id?'Editar':'Añadir al armario'}</h3>${w.photo?`<img class="photo" data-media="${w.photo}" style="max-height:220px;margin:0 0 6px">`:''}
+    <label class="f">Nombre</label><input id="wName" value="${esc(w.name||'')}" placeholder="Ej: Vestido negro de punto">
+    <div class="grid2"><div><label class="f">Tipo</label><select id="wType">${WTYPES.map(t=>`<option ${w.type===t?'selected':''}>${t}</option>`).join('')}</select></div><div><label class="f">Estado</label><select id="wStatus"><option value="tengo" ${w.status!=='quiero'?'selected':''}>Lo tengo</option><option value="quiero" ${w.status==='quiero'?'selected':''}>Lo quiero</option></select></div>
+    <div><label class="f">Talla</label><input id="wSize" value="${esc(w.size||'')}"></div><div><label class="f">Precio (€)</label><input id="wPrice" inputmode="decimal" value="${esc(w.price||'')}"></div></div>
+    <label class="f">Color / notas</label><input id="wNote" value="${esc(w.note||'')}" placeholder="Color, tienda, enlace…">
+    <label class="f">Foto</label><input type="file" id="wPhoto" accept="image/*">
+    <div class="actions">${w.id?`<button class="btn danger" data-act="delWard" data-id="${w.id}">Borrar</button>`:'<button class="btn soft" data-act="close">Cancelar</button>'}<button class="btn" data-act="saveWard" data-id="${w.id||''}">Guardar</button></div>`);hydrate()},
+  saveWard:async el=>{const name=fv('wName');if(!name)return toast('Ponle un nombre');const old=S.wardrobe.find(x=>x.id===el.dataset.id);const ph=await photoFrom('wPhoto');
+    if(ph&&old&&old.photo)delMedia(old.photo);
+    const d={name,type:fv('wType'),status:fv('wStatus'),size:fv('wSize'),price:fv('wPrice'),note:fv('wNote'),photo:ph||(old&&old.photo)||''};
+    if(old)Object.assign(old,d);else S.wardrobe.unshift({id:uid(),...d});save();closeSheet();render()},
+  delWard:el=>{if(!confirm('¿Borrar del armario?'))return;const w=S.wardrobe.find(x=>x.id===el.dataset.id);delMedia(w.photo);S.wardrobe=S.wardrobe.filter(x=>x!==w);save();closeSheet();render()},
+  /* Salud */
+  editMed:el=>{const m=S.meds.find(x=>x.id===el.dataset.id)||{};
+    sheet(`<h3>${m.id?'Editar':'Añadir'} medicación</h3><label class="f">Nombre</label><input id="dName" value="${esc(m.name||'')}"><label class="f">Dosis (tal como te la han pautado)</label><input id="dDose" value="${esc(m.dose||'')}" placeholder="Ej: 1 comprimido, 2 pulsaciones…">
+    <div class="grid2"><div><label class="f">Hora</label><input type="time" id="dTime" value="${esc(m.time||'')}"></div><div><label class="f">Desde</label><input type="date" id="dSince" value="${esc(m.since||'')}"></div></div>
+    <div class="actions"><button class="btn soft" data-act="close">Cancelar</button><button class="btn" data-act="saveMed" data-id="${m.id||''}">Guardar</button></div>`)},
+  saveMed:el=>{const name=fv('dName');if(!name)return toast('Ponle un nombre');const d={name,dose:fv('dDose'),time:fv('dTime'),since:fv('dSince')};const m=S.meds.find(x=>x.id===el.dataset.id);
+    if(m)Object.assign(m,d);else S.meds.push({id:uid(),...d});save();closeSheet();render()},
+  delMed:el=>{if(!confirm('¿Quitar esta medicación de la lista?'))return;S.meds=S.meds.filter(x=>x.id!==el.dataset.id);save();render()},
+  editAppt:()=>{sheet(`<h3>Nueva cita</h3><label class="f">Fecha</label><input type="date" id="aDate" value="${ymd()}"><label class="f">Qué es</label><input id="aText" placeholder="Ej: Endocrino, analítica, depilación láser…">
+    <div class="actions"><button class="btn soft" data-act="close">Cancelar</button><button class="btn" data-act="saveAppt">Guardar</button></div>`)},
+  saveAppt:()=>{const text=fv('aText');if(!text)return toast('Escribe qué cita es');S.appts.push({id:uid(),date:fv('aDate')||ymd(),text});save();closeSheet();render()},
+  delAppt:el=>{S.appts=S.appts.filter(x=>x.id!==el.dataset.id);save();render()},
+  editLab:()=>{const names=[...new Set(S.labs.map(l=>l.name))];
+    sheet(`<h3>Valor de analítica</h3><label class="f">Fecha</label><input type="date" id="lDate" value="${ymd()}"><label class="f">Parámetro</label><input id="lName" list="lNames" placeholder="Ej: Estradiol, Testosterona…"><datalist id="lNames">${names.map(n=>`<option value="${esc(n)}">`).join('')}</datalist>
+    <div class="grid2"><div><label class="f">Valor</label><input id="lVal" inputmode="decimal"></div><div><label class="f">Unidad</label><input id="lUnit" placeholder="pg/ml, ng/dl…"></div></div><label class="f">Nota</label><input id="lNote">
+    <div class="actions"><button class="btn soft" data-act="close">Cancelar</button><button class="btn" data-act="saveLab">Guardar</button></div>`)},
+  saveLab:()=>{const name=fv('lName'),value=fv('lVal');if(!name||!value)return toast('Pon parámetro y valor');S.labs.push({id:uid(),date:fv('lDate')||ymd(),name,value,unit:fv('lUnit'),note:fv('lNote')});save();closeSheet();render()},
+  delLab:el=>{S.labs=S.labs.filter(x=>x.id!==el.dataset.id);save();render()},
+  /* Íntimo */
+  ilvl:el=>{ilvl=+el.dataset.l;drawn=null;render()},
+  drawInt:()=>{const pool=S.intimate.filter(i=>(!ilvl||i.lvl===ilvl)&&(!drawn||i.id!==drawn.id||S.intimate.length===1));if(!pool.length)return toast('No hay tareas en este nivel');drawn=pool[Math.floor(Math.random()*pool.length)];render()},
+  intDone:()=>{if(!drawn)return;S.intimateLog.push({date:ymd(),text:drawn.text});drawn=null;save();toast('Hecha ✓');render()},
+  editInt:el=>{const i=S.intimate.find(x=>x.id===el.dataset.id)||{lvl:1};
+    sheet(`<h3>${i.id?'Editar tarea':'Nueva tarea'}</h3><label class="f">Tarea</label><textarea id="iText" placeholder="Escribe tu tarea…">${esc(i.text||'')}</textarea>
+    <label class="f">Intensidad</label><select id="iLvl">${[1,2,3].map(l=>`<option value="${l}" ${i.lvl===l?'selected':''}>${FL[l]}</option>`).join('')}</select>
+    <div class="actions"><button class="btn soft" data-act="close">Cancelar</button><button class="btn" data-act="saveInt" data-id="${i.id||''}">Guardar</button></div>`)},
+  saveInt:el=>{const text=fv('iText');if(!text)return toast('Escribe la tarea');const d={text,lvl:+fv('iLvl')||1};const i=S.intimate.find(x=>x.id===el.dataset.id);
+    if(i)Object.assign(i,d);else S.intimate.push({id:uid(),...d});save();closeSheet();render()},
+  delInt:el=>{if(!confirm('¿Borrar esta tarea?'))return;S.intimate=S.intimate.filter(x=>x.id!==el.dataset.id);if(drawn&&drawn.id===el.dataset.id)drawn=null;save();render()},
+  clearIntLog:()=>{if(!confirm('¿Borrar el historial?'))return;S.intimateLog=[];save();render()},
+  /* Retos */
+  editReto:el=>{const i=el.dataset.i!==undefined?+el.dataset.i:-1;
+    sheet(`<h3>${i>=0?'Editar reto':'Nuevo reto'}</h3><textarea id="tText" style="min-height:80px">${i>=0?esc(S.retos[i]):''}</textarea><div class="actions"><button class="btn soft" data-act="close">Cancelar</button><button class="btn" data-act="saveReto" data-i="${i}">Guardar</button></div>`)},
+  saveReto:el=>{const t=fv('tText');if(!t)return toast('Escribe el reto');const i=+el.dataset.i;if(i>=0)S.retos[i]=t;else S.retos.push(t);save();closeSheet();render()},
+  delReto:el=>{const i=+el.dataset.i;if(S.retoPick&&S.retoPick.text===S.retos[i])S.retoPick=null;S.retos.splice(i,1);save();render()},
+  /* Ajustes */
+  setPin:()=>{sheet(`<h3>${S.settings.pin?'Cambiar':'Poner'} PIN</h3><label class="f">PIN de 4 números</label><input type="password" id="p1" inputmode="numeric" maxlength="4" pattern="[0-9]*"><label class="f">Repite el PIN</label><input type="password" id="p2" inputmode="numeric" maxlength="4" pattern="[0-9]*">
+    <p class="small mute">Si lo olvidas no hay forma de recuperarlo sin borrar los datos. Haz antes una copia.</p><div class="actions"><button class="btn soft" data-act="close">Cancelar</button><button class="btn" data-act="savePin">Guardar</button></div>`)},
+  savePin:()=>{const a=fv('p1'),b=fv('p2');if(!/^\d{4}$/.test(a))return toast('Tienen que ser 4 números');if(a!==b)return toast('No coinciden');S.settings.pin=hashPin(a);save();closeSheet();render();toast('PIN activado 🔒')},
+  delPin:()=>{if(!confirm('¿Quitar el PIN?'))return;S.settings.pin='';save();render()},
+  discreet:()=>{S.settings.discreet=!S.settings.discreet;save();render()},
+  key:el=>{const k=el.dataset.k;if(k==='del')pinBuf=pinBuf.slice(0,-1);else if(pinBuf.length<4)pinBuf+=k;drawDots();
+    if(pinBuf.length===4){if(hashPin(pinBuf)===S.settings.pin){$('#lock').classList.add('hidden');pinBuf=''}else{const p=$('#dots');p.classList.remove('shake');void p.offsetWidth;p.classList.add('shake');$('#lockMsg').textContent='PIN incorrecto';setTimeout(()=>{pinBuf='';drawDots()},350)}}},
+  export:async()=>{toast('Preparando copia…');const ids=[...S.journal.map(e=>e.photo),...S.wardrobe.map(w=>w.photo),...S.recs.map(r=>r.media)].filter(Boolean);const media={};
+    for(const id of ids){try{const b=await getMedia(id);if(b)media[id]=await new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.readAsDataURL(b)})}catch(e){}}
+    const blob=new Blob([JSON.stringify({app:'lumi',v:1,state:{...S,settings:{...S.settings,aiKey:''}},media})],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`${S.settings.discreet?'notas':'lumi'}-copia-${ymd()}.json`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000)},
+  import:()=>$('#importFile').click(),
+  wipe:async()=>{if(!confirm('Se borrará TODO: diario, fotos, grabaciones, tareas… ¿Seguro?'))return;if(!confirm('Última confirmación. No se puede deshacer.'))return;
+    try{localStorage.removeItem(KEY)}catch(e){}try{indexedDB.deleteDatabase('lumi_media')}catch(e){}location.reload()}
+};
+$('#importFile').addEventListener('change',async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;
+  try{const d=JSON.parse(await f.text());if(d.app!=='lumi'||!d.state)throw 0;if(!confirm('Esto sustituirá los datos actuales por los de la copia. ¿Continuar?'))return;
+    for(const [id,url] of Object.entries(d.media||{})){const b=await (await fetch(url)).blob();await putMedia(b,id)}
+    const k=S.settings.aiKey;S=Object.assign(JSON.parse(JSON.stringify(DEF)),d.state);if(!S.settings.aiKey)S.settings.aiKey=k;save();render();toast('Copia restaurada ✓')}catch(err){toast('Ese archivo no es una copia válida')}});
+
+document.addEventListener('click',e=>{const el=e.target.closest('[data-act]');if(!el)return;const f=ACT[el.dataset.act];if(f){e.preventDefault();f(el,e)}});
+document.addEventListener('change',e=>{if(e.target.dataset.chg==='name'){S.settings.name=e.target.value.trim();save();toast('Guardado ✓')}});
+
+function stageOpts(act){return STAGES.slice(1).map((s,i)=>`<button class="chk ${S.stage===i+1?'sel':''}" data-act="${act}" data-s="${i+1}"><span class="ic">${s.e}</span><span class="tx"><b>${s.n}</b><small>${s.d}</small></span></button>`).join('')}
+function renderNav(){document.querySelectorAll('.nav button').forEach(b=>{const v=b.dataset.v;b.style.display=SECS.some(s=>s[0]===v)&&!secOn(v)?'none':''})}
+function welcome(){sheet(`<h3>Bienvenida 🌸</h3><p class="mute" style="margin-top:-4px">Vamos a adaptar la app a ti. Todo se puede cambiar luego en Ajustes.</p>
+  <label class="f">¿Cómo quieres que te llame? (opcional)</label><input id="obName" value="${esc(S.settings.name)}">${nameUI('obName')}
+  <label class="f">¿En qué punto estás?</label>${stageOpts('obStage')}
+  <label class="f">¿Qué quieres usar?</label>${SECS.map(s=>`<div class="li"><span style="font-size:20px">${s[1]}</span><div class="grow">${s[2]}</div><button class="sw ${secOn(s[0])?'on':''}" data-act="togSec" data-k="${s[0]}"></button></div>`).join('')}
+  <button class="btn block" style="margin-top:16px" data-act="startApp">Empezar</button>`)}
+
+/* ================= Arranque ================= */
+render();
+if(!S.stage)welcome();
+if(S.settings.pin)showLock();
+</script>
+</body>
+</html>
