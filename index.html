@@ -173,8 +173,8 @@ html.dark #toast{background:#f3e6ee;color:#17101a}
 
 <script>
 'use strict';
-const APP_V='1.17';
-const APP_NEWS='Importador mejorado, borrar tareas (todas o por categoría) y lista agrupada por categorías';
+const APP_V='1.18';
+const APP_NEWS='Niveles 🔥 automáticos: por orden progresivo o con IA, al importar y en tus tareas';
 /* ================= Datos ================= */
 const KEY='lumi_v1';
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
@@ -733,7 +733,20 @@ function parseImport(txt){
     let x=t.replace(/🔥/g,'').replace(/\(\d{1,3}\s*(min|mins|minutos|m)\.?\)/i,'').replace(NUM,'').replace(/^\s*(?:\[\s?[xX✓]?\s?\]|☐|☑|[-•*·–—])\s*/,'').trim();
     x=x.replace(/\s+([.,;:!?])/g,'$1').replace(/\s{2,}/g,' ').trim();
     if(x.length>2)out.push({text:x.slice(0,400),lvl:f?Math.min(3,f):0,mins,sec})}
+  const bySec={};out.forEach(o=>{(bySec[o.sec]=bySec[o.sec]||[]).push(o)});
+  Object.values(bySec).forEach(g=>g.forEach((o,k)=>{o.auto=1+Math.min(2,Math.floor(3*k/g.length))}));
   return out}
+function autoLevels(list){const g={};list.forEach(i=>{(g[i.cat||'']=g[i.cat||'']||[]).push(i)});
+  Object.values(g).forEach(a=>a.forEach((i,k)=>{i.lvl=1+Math.min(2,Math.floor(3*k/a.length))}))}
+async function aiLevels(list,onProg){const N=40;let done=0,fail=0;
+  for(let k=0;k<list.length;k+=N){const ch=list.slice(k,k+N);
+    try{const t=await ai([{role:'system',content:'Clasificas la intensidad de tareas personales de una persona adulta. Respondes solo con JSON.'},
+      {role:'user',content:'Valora la intensidad de cada tarea de 1 a 3 (1 = suave, 2 = media, 3 = muy intensa). Responde SOLO con un array JSON de números, uno por tarea y en el mismo orden, sin texto.\n\n'+ch.map((i,n)=>(n+1)+'. '+i.text).join('\n')}],800,.2,1);
+      const m=(t||'').match(/\[[\s\S]*?\]/);const arr=m?JSON.parse(m[0]):null;
+      if(Array.isArray(arr)&&arr.length>=ch.length*.8)ch.forEach((i,n)=>{const v=parseInt(arr[n]);if(v>=1&&v<=3)i.lvl=v});else fail++}
+    catch(e){fail++;if(/clave|Límite/.test(e.message||''))throw e}
+    done=Math.min(list.length,k+N);onProg&&onProg(done,list.length)}
+  return fail}
 function intHoy(){if(!S.intimate.length)return null;const t=ymd();
   if(!S.intPick||S.intPick.date!==t||!S.intimate.some(x=>x.id===S.intPick.id)){const it=S.intimate[Math.floor(Math.random()*S.intimate.length)];S.intPick={date:t,id:it.id,done:false};save()}
   return {...S.intPick,item:S.intimate.find(x=>x.id===S.intPick.id)}}
@@ -748,7 +761,7 @@ function vIntimo(){
   <div class="chips">${[0,1,2,3].map(l=>`<button class="chip ${ilvl===l?'on':''}" data-act="ilvl" data-l="${l}">${l?FL[l]:'Cualquier nivel'}</button>`).join('')}</div>
   ${drawn?`<div class="drawn">${esc(drawn.text)}<div style="font-size:14px;margin-top:8px">${FL[drawn.lvl]||''}${drawn.cat?' · '+esc(drawn.cat):''}</div>${drawn.mins?`<button class="btn sm" style="margin-top:12px;background:rgba(255,255,255,.18)" data-act="gTimer" data-s="${drawn.mins*60}">▶ ${mmss(drawn.mins*60)}</button>`:''}</div><div class="row"><button class="btn block" data-act="intDone">✓ Hecha</button><button class="btn ghost block" data-act="drawInt">Otra</button></div>`:`<button class="btn block" data-act="drawInt" ${pool.length?'':'disabled style="opacity:.5"'}>🎲 Sacar al azar (${pool.length})</button>`}</div>`;
   h+=`<div class="card"><div class="li"><div class="grow"><b>Reto íntimo del día</b><div class="mute small">Te sale cada día en Hoy, tapado. Solo se ve si lo tocas.</div></div><button class="sw ${S.settings.intDaily?'on':''}" data-act="intDaily"></button></div></div>`;
-  h+=`<div class="card"><h2>Mis tareas <span class="row" style="gap:6px"><button class="btn sm soft" data-act="intCats">Categorías</button><button class="btn sm soft" data-act="intImport">📥 Importar</button>${S.intimate.length?'<button class="btn sm soft" data-act="intBulkDel">🗑</button>':''}<button class="btn sm" data-act="editInt">＋</button></span></h2><p class="small mute" style="margin:0 0 10px">Tú escribes tus tareas. Se guardan solo en este dispositivo.</p>
+  h+=`<div class="card"><h2>Mis tareas <span class="row" style="gap:6px"><button class="btn sm soft" data-act="intCats">Categorías</button><button class="btn sm soft" data-act="intImport">📥 Importar</button>${S.intimate.length?'<button class="btn sm soft" data-act="intLevels">🎚️</button><button class="btn sm soft" data-act="intBulkDel">🗑</button>':''}<button class="btn sm" data-act="editInt">＋</button></span></h2><p class="small mute" style="margin:0 0 10px">Tú escribes tus tareas. Se guardan solo en este dispositivo.</p>
   ${(()=>{const row=i=>`<div class="li"><div class="grow">${esc(i.text)}<div class="small">${FL[i.lvl]||''}${i.cat?` <span class="tag l" style="margin:0 0 0 4px">${esc(i.cat)}</span>`:''}${i.mins?` <span class="mute">· ⏱ ${i.mins} min</span>`:''}</div></div><button class="x" data-act="editInt" data-id="${i.id}">✎</button><button class="x" data-act="delInt" data-id="${i.id}">✕</button></div>`;
     if(!S.intimate.length)return '<div class="empty">Todavía no has escrito ninguna.</div>';
     if(S.intimate.length<=20)return S.intimate.map(row).join('');
@@ -1085,17 +1098,37 @@ const ACT={
     <textarea id="impText" style="min-height:180px" placeholder="1. Primera tarea&#10;2. Segunda tarea (5 min)&#10;- Tercera tarea 🔥🔥"></textarea>
     <label class="f">O desde un archivo de texto (.txt)</label><input type="file" id="impFile" accept=".txt,text/plain">
     <div class="grid2"><div><label class="f">Categoría</label><select id="impCat"><option value="">Sin categoría</option>${cats.map(c=>`<option ${icat===c?'selected':''}>${esc(c)}</option>`).join('')}</select></div>
-    <div><label class="f">Nivel por defecto</label><select id="impLvl">${[1,2,3].map(l=>`<option value="${l}">${FL[l]}</option>`).join('')}</select></div></div>
+    <div><label class="f">Nivel</label><select id="impLvl"><option value="pos">Automático por orden</option>${hasAI()?'<option value="ai">Automático con IA</option>':''}${[1,2,3].map(l=>`<option value="${l}">Todas ${FL[l]}</option>`).join('')}</select></div></div>
+    <p class="small mute" style="margin:6px 0 0">"Por orden": en cada sección, el primer tercio 🔥, el segundo 🔥🔥 y el último 🔥🔥🔥 (para listas progresivas). Si una línea ya trae 🔥, se respeta.</p>
     <label class="li" style="cursor:pointer;gap:10px"><input type="checkbox" id="impSec" checked style="width:auto"><div class="grow small">Crear categorías con las secciones del archivo (si las tiene). Si no, usa la categoría elegida.</div></label>
     <p class="small mute" id="impCount" style="margin-top:10px"></p>
     <div class="actions"><button class="btn soft" data-act="close">Cancelar</button><button class="btn" data-act="intImportGo">Importar</button></div>`)},
   intImportGo:()=>{const lines=parseImport(fv('impText'));if(!lines.length)return toast('Pega al menos una tarea');
-    const ex=new Set(S.intimate.map(x=>x.text.toLowerCase()));const cat=fv('impCat'),dl=+fv('impLvl')||1;let n=0;
+    const ex=new Set(S.intimate.map(x=>x.text.toLowerCase()));const cat=fv('impCat'),mode=fv('impLvl'),dl=+mode||1;let n=0;const added=[];
     const bySec=$('#impSec')&&$('#impSec').checked;S.intCats=S.intCats||[];
     for(const l of lines){if(ex.has(l.text.toLowerCase()))continue;ex.add(l.text.toLowerCase());let c=cat;
       if(bySec&&l.sec){c=l.sec.slice(0,40);if(!S.intCats.includes(c))S.intCats.push(c)}
-      S.intimate.push({id:uid(),text:l.text,lvl:l.lvl||dl,cat:c,mins:l.mins||0});n++}
+      const it={id:uid(),text:l.text,lvl:l.lvl||(mode==='pos'||mode==='ai'?l.auto:dl),cat:c,mins:l.mins||0};S.intimate.push(it);added.push(it);n++}
+    if(mode==='ai'&&added.length){save();ACT.levelsRun(null,added);return}
     save();closeSheet();render();toast(n?`${n} tareas importadas ✓`:'Ya las tenías todas')},
+  intLevels:()=>{const cats=[...(S.intCats||[])].filter(c=>S.intimate.some(i=>i.cat===c));
+    sheet(`<h3>🎚️ Niveles automáticos</h3><p class="small mute" style="margin-top:-4px">Pon el nivel 🔥 de tus tareas automáticamente.</p>
+    <label class="f">¿Qué tareas?</label><select id="lvScope"><option value="__all">Todas (${S.intimate.length})</option>${cats.map(c=>`<option value="${esc(c)}">${esc(c)} (${S.intimate.filter(i=>i.cat===c).length})</option>`).join('')}${S.intimate.some(i=>!i.cat)?'<option value="">Sin categoría</option>':''}</select>
+    <label class="f">Método</label>
+    <button class="chk sel" data-act="lvPick" data-m="pos"><span class="ic">📶</span><span class="tx"><b>Por orden</b><small>Primer tercio de cada categoría 🔥, segundo 🔥🔥, último 🔥🔥🔥. Sin internet.</small></span></button>
+    ${hasAI()?`<button class="chk" data-act="lvPick" data-m="ai"><span class="ic">✨</span><span class="tx"><b>Con IA</b><small>Valeria valora cada tarea. Envía las tareas a OpenRouter y gasta ~1 petición por cada 40.</small></span></button>`:''}
+    <p class="small mute" id="lvProg"></p>
+    <div class="actions"><button class="btn soft" data-act="close">Cancelar</button><button class="btn" data-act="levelsRun">Aplicar</button></div>`)},
+  lvPick:el=>{el.parentNode.querySelectorAll('[data-act=lvPick]').forEach(b=>b.classList.toggle('sel',b===el))},
+  levelsRun:async(el,ev,preset)=>{
+    let list=preset,mode='ai';
+    if(!preset){const sc=fv('lvScope');list=sc==='__all'?S.intimate:S.intimate.filter(i=>(i.cat||'')===sc);const p=document.querySelector('[data-act=lvPick].sel');mode=p?p.dataset.m:'pos'}
+    if(!list.length)return toast('No hay tareas');
+    if(mode==='pos'){autoLevels(list);save();closeSheet();render();return toast('Niveles puestos por orden ✓')}
+    sheet(`<h3>✨ Valeria está valorando tus tareas…</h3><div class="bar" style="height:10px"><i id="lvBar" style="width:0%"></i></div><p class="small mute" id="lvTxt">0 de ${list.length}</p><p class="small mute">Puedes seguir usando la app; no cierres esta pestaña.</p>`);
+    try{const fail=await aiLevels(list,(d,t)=>{const b=$('#lvBar'),x=$('#lvTxt');if(b)b.style.width=(100*d/t)+'%';if(x)x.textContent=d+' de '+t});
+      save();closeSheet();render();toast(fail?`Hecho, pero en ${fail} bloque(s) la IA no respondió: esas tareas mantienen su nivel`:'Niveles puestos con IA ✓')}
+    catch(e){save();closeSheet();render();toast('⚠️ '+(e.message||'No se pudo conectar')+'. Prueba el método por orden.')}},
   iexp:el=>{iexp=iexp===el.dataset.c?null:el.dataset.c;render()},
   intBulkDel:()=>{const groups=[...(S.intCats||[]),''].map(c=>[c,S.intimate.filter(i=>(i.cat||'')===c).length]).filter(g=>g[1]);
     sheet(`<h3>🗑 Borrar tareas</h3><p class="small mute" style="margin-top:-4px">No se puede deshacer. Si quieres, haz antes una copia en Ajustes.</p>
