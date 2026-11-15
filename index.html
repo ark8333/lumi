@@ -89,7 +89,7 @@ textarea{min-height:110px;resize:vertical;font-family:var(--sans)}
 .pad button{height:74px;border-radius:50%;border:0;background:#fff;font:500 28px var(--serif);color:var(--ink);box-shadow:0 6px 18px -10px rgba(120,40,80,.35);cursor:pointer}
 .pad button.n{background:none;box-shadow:none;font-size:22px}
 .shake{animation:sh .35s}@keyframes sh{25%{transform:translateX(-10px)}75%{transform:translateX(10px)}}
-#toast{position:fixed;left:50%;bottom:calc(92px + env(safe-area-inset-bottom));transform:translate(-50%,20px);background:var(--ink);color:#fff;padding:10px 16px;border-radius:14px;font-size:14px;opacity:0;transition:.25s;pointer-events:none;z-index:60;white-space:nowrap}
+#toast{position:fixed;left:50%;bottom:calc(92px + env(safe-area-inset-bottom));transform:translate(-50%,20px);background:var(--ink);color:#fff;padding:10px 16px;border-radius:14px;font-size:14px;opacity:0;transition:.25s;pointer-events:none;z-index:60;max-width:90vw;text-align:center}
 #toast.on{opacity:1;transform:translate(-50%,0)}
 .week{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;text-align:center}.week div{font-size:11px;color:var(--mute);text-transform:capitalize}
 .week i{display:block;margin:6px auto 0;width:32px;height:32px;border-radius:11px;background:#f3e6eb}
@@ -162,7 +162,8 @@ html.dark #toast{background:#f3e6ee;color:#17101a}
 
 <script>
 'use strict';
-const APP_V='2026.11.15-9';
+const APP_V='1.10';
+const APP_NEWS='Ahora ves la versión en Ajustes y te aviso cuando me actualizo';
 /* ================= Datos ================= */
 const KEY='lumi_v1';
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
@@ -628,6 +629,7 @@ function vRetos(){
 
 function vAjustes(){
   let h=head('Ajustes','Privacidad y copias','mas');
+  h+=`<div class="card"><div class="row between"><div><div class="mute small">Versión</div><div style="font:500 26px var(--serif)">${APP_V}</div></div><button class="btn sm ghost" data-act="checkUpd">Buscar actualización</button></div><div class="small mute" style="margin-top:6px">Se actualiza sola. Última novedad: ${esc(APP_NEWS)}</div></div>`;
   h+=`<div class="card"><h2>Tu nombre</h2><input id="setName" placeholder="¿Cómo quieres que te llame?" value="${esc(S.settings.name)}" data-chg="name">${nameUI('setName')}</div>`;
   if(!isInstalled())h+=`<div class="card"><h2>Instalar como app</h2>${installEv?'<p class="small mute" style="margin:0 0 10px">Icono propio, pantalla completa y sin la barra del navegador.</p><button class="btn block" data-act="install">📲 Instalar app</button>':'<p class="small mute" style="margin:0">En Brave: menú ⋮ → <b>Instalar app</b> o <b>Añadir a pantalla de inicio</b>.</p>'}</div>`;
   const th=S.settings.theme||'dark';
@@ -647,7 +649,6 @@ function vAjustes(){
   <p class="small mute" style="margin:12px 0 0">Todo se guarda solo en este navegador, en este dispositivo. No se envía nada a ningún sitio y funciona sin internet. El PIN es una cortina para miradas curiosas, no un cifrado.</p></div>`;
   h+=`<div class="card"><h2>Copias de seguridad</h2><p class="small mute" style="margin:0 0 12px">Si borras los datos del navegador (o tienes activado en Brave "borrar datos al salir"), se pierde todo. Haz una copia de vez en cuando y guárdala donde quieras.</p>
   <div class="row"><button class="btn block" data-act="export">⬇ Exportar copia</button><button class="btn ghost block" data-act="import">⬆ Importar</button></div></div>`;
-  h+=`<p class="small mute" style="text-align:center">Lumi · versión ${APP_V} · se actualiza sola</p>`;
   h+=`<div class="card"><h2>Zona peligrosa</h2><button class="btn danger block" data-act="wipe">Borrar todos los datos</button></div>`;
   return h;
 }
@@ -776,6 +777,11 @@ const ACT={
     const tot=+el.dataset.s,t0=Date.now();el.textContent='⏳ '+mmss(tot);
     timer=setInterval(()=>{const r=Math.max(0,tot-Math.floor((Date.now()-t0)/1000));el.textContent=r?'⏳ '+mmss(r):'✓ ¡Hecho!';
       if(!r){clearInterval(timer);timer=null;if(navigator.vibrate)navigator.vibrate([200,100,200]);speak('¡Tiempo!')}},250)},
+  checkUpd:async el=>{el.textContent='Buscando…';el.disabled=true;
+    try{const r=await fetch(location.pathname+'?v='+Date.now(),{cache:'no-store'});const m=(await r.text()).match(/const APP_V='([^']+)'/);
+      if(m&&m[1]!==APP_V){toast('Nueva versión '+m[1]+', actualizando…');try{await fetch(location.href,{cache:'reload'})}catch(e){}setTimeout(()=>location.reload(),900);return}
+      toast('Ya tienes la última versión ✓')}catch(e){toast('Sin conexión, prueba más tarde')}
+    el.textContent='Buscar actualización';el.disabled=false},
   setTheme:el=>{S.settings.theme=el.dataset.t;save();render()},
   sugName:el=>{const box=document.getElementById(el.dataset.box);const pick=[...NAMES].sort(()=>Math.random()-.5).slice(0,8);
     box.innerHTML=pick.map(n=>`<button class="chip" data-act="useName" data-n="${n}" data-in="${el.dataset.in}">${n}</button>`).join('');el.textContent='🎲 Otros nombres'},
@@ -942,6 +948,7 @@ setInterval(checkUpdate,30*60*1000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(checkUpdate,1500)});
 
 /* ================= Arranque ================= */
+try{const pv=localStorage.getItem('lumi_ver');if(pv&&pv!==APP_V)setTimeout(()=>toast('✨ Actualizada a la versión '+APP_V),600);localStorage.setItem('lumi_ver',APP_V)}catch(e){}
 render();
 if(!S.stage)welcome();
 if(S.settings.pin)showLock();
