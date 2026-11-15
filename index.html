@@ -176,8 +176,8 @@ html.dark #toast{background:#f3e6ee;color:#17101a}
 
 <script>
 'use strict';
-const APP_V='1.23';
-const APP_NEWS='Arreglado: ahora se ve qué emoji has elegido en el diario (modo oscuro)';
+const APP_V='1.24';
+const APP_NEWS='Fotos y audios en la nube: cifrados en tu GitHub privado, sin llenar el móvil y visibles en los dos dispositivos';
 /* ================= Datos ================= */
 const KEY='lumi_v1';
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
@@ -254,14 +254,19 @@ function idb(){return _db||(_db=new Promise((res,rej)=>{const r=indexedDB.open('
 async function tx(mode,fn){const db=await idb();return new Promise((res,rej)=>{const t=db.transaction('m',mode);const q=fn(t.objectStore('m'));t.oncomplete=()=>res(q&&q.result);t.onerror=()=>rej(t.error)})}
 async function putMedia(blob,id){id=id||uid();await tx('readwrite',s=>s.put(blob,id));return id}
 const getMedia=id=>tx('readonly',s=>s.get(id));
-const delMedia=id=>id&&tx('readwrite',s=>s.delete(id)).catch(()=>{});
+const delLocalMedia=id=>id&&tx('readwrite',s=>s.delete(id)).catch(()=>{});
+const delMedia=id=>{if(!id)return;delLocalMedia(id);if(S.cloudMedia&&S.cloudMedia[id]){delete S.cloudMedia[id];if(typeof cloudDel==='function')cloudDel(id)}};
 const urlCache={};
 async function mediaURL(id){if(!id)return'';if(urlCache[id])return urlCache[id];try{const b=await getMedia(id);if(!b)return'';return urlCache[id]=URL.createObjectURL(b)}catch(e){return''}}
 function hydrate(){document.querySelectorAll('[data-media]').forEach(async el=>{const u=await mediaURL(el.dataset.media);if(u){el.src=u;return}
   let b=null;try{b=await getMedia(el.dataset.media)}catch(e){}if(b||!el.isConnected)return;
+  const id=el.dataset.media;
+  if(S.cloudMedia&&S.cloudMedia[id]&&syncOn()){el.style.opacity='.35';
+    try{const blob=await cloudGet(id);if(blob){urlCache[id]=URL.createObjectURL(blob);if(el.isConnected){el.src=urlCache[id];el.style.opacity=''}if(!syncCfg().cloudOnly)putMedia(blob,id).catch(()=>{});return}}catch(e){}
+    el.style.opacity=''}
   const d=document.createElement('div');d.className='ph-miss';d.innerHTML=el.tagName==='AUDIO'?'🎤 Grabación en tu otro dispositivo':'📷<br><span>En tu otro dispositivo</span>';el.replaceWith(d)})}
 function resizeImg(file,max=1200){return new Promise(res=>{const img=new Image(),u=URL.createObjectURL(file);img.onload=()=>{let w=img.width,h=img.height;const k=Math.min(1,max/Math.max(w,h));w=Math.round(w*k);h=Math.round(h*k);const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);URL.revokeObjectURL(u);c.toBlob(b=>res(b||file),'image/jpeg',.85)};img.onerror=()=>res(file);img.src=u})}
-async function photoFrom(inputId){const f=document.getElementById(inputId);if(!f||!f.files||!f.files[0])return null;return putMedia(await resizeImg(f.files[0]))}
+async function photoFrom(inputId){const f=document.getElementById(inputId);if(!f||!f.files||!f.files[0])return null;setTimeout(()=>{if(typeof mediaUpload==='function')mediaUpload()},3000);return putMedia(await resizeImg(f.files[0]))}
 
 /* ================= Utilidades ================= */
 const $=s=>document.querySelector(s);
@@ -860,6 +865,12 @@ function vAjustes(){
     <div class="li"><div class="grow"><b>${syncing?'Sincronizando…':c.lastSync?'Última vez: '+new Date(c.lastSync).toLocaleString('es-ES',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'Activada'}</b>${syncMsg&&!syncing?`<div class="small" style="color:var(--rose-d)">${esc(syncMsg)}</div>`:''}<div class="small mute">Cifrado con tu contraseña. Se sincroniza sola al abrir y tras cada cambio.</div></div></div>
     <div class="small mute" style="margin-top:8px">En este dispositivo: ${S.intimate.length} tareas íntimas · ${S.routines.length} rutinas · ${S.measures.length} medidas · ${S.journal.length} entradas · ${S.retosLog.length} retos hechos</div>
     <div class="row" style="margin-top:10px"><button class="btn block" data-act="syncNow">Sincronizar ahora</button><button class="btn soft" data-act="syncOff">Desactivar</button></div>
+    <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line)">
+      <div class="li" style="padding-top:0"><div class="grow"><b>📷 Fotos y audios en la nube</b><div class="small mute">Cifrados en un repositorio privado de tu GitHub (${MEDIA_REPO}). Se ven en los dos dispositivos.</div></div><button class="sw ${c.media?'on':''}" data-act="mediaToggle"></button></div>
+      ${c.media?`<div class="li"><div class="grow"><b>Solo en la nube</b><div class="small mute">Borra la copia de este dispositivo en cuanto está subida. No llena el móvil; para verlas hace falta internet.</div></div><button class="sw ${c.cloudOnly?'on':''}" data-act="cloudOnly"></button></div>
+      <div class="small mute" id="mediaStat">${upBusy?`Subiendo… ${upDone} de ${upTotal}`:`${Object.keys(S.cloudMedia||{}).length} de ${mediaIds().length} archivos en la nube`}${upMsg?`<div style="color:var(--rose-d)">${esc(upMsg)}</div>`:''}</div>
+      <button class="btn sm ghost" style="margin-top:8px" data-act="mediaNow">Subir ahora</button>`:''}
+    </div>
     ${(()=>{try{const p=JSON.parse(localStorage.getItem('lumi_prev')||'null');return p?`<button class="btn sm soft block" style="margin-top:8px" data-act="syncUndo">↩️ Deshacer última sincronización (${new Date(p.at).toLocaleString('es-ES',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})})</button>`:''}catch(e){return ''}})()}`:`
     <p class="small mute" style="margin:0 0 6px">Tus datos se guardan <b>cifrados</b> en un archivo secreto de tu cuenta anónima de GitHub. Nadie puede leerlos sin tu contraseña. Las fotos y audios se quedan en cada dispositivo.</p>
     <details style="margin:6px 0 4px"><summary class="small" style="cursor:pointer;color:var(--rose-d);font-weight:600">Cómo conseguir la llave de GitHub</summary><ol class="small" style="padding-left:18px;margin:8px 0;line-height:1.6">
@@ -874,6 +885,8 @@ function vAjustes(){
     <label class="f">Repite la contraseña</label><input id="syPass2" type="password" autocomplete="new-password">
     <p class="small mute">Pon la <b>misma llave y la misma contraseña</b> en el móvil y en el ordenador. Si olvidas la contraseña no se puede recuperar lo sincronizado (tus datos locales siguen ahí).</p>
     <button class="btn block" data-act="syncSetup">Activar sincronización</button>`}</div>`}
+  h+=`<div class="card"><h2>💽 Espacio</h2><div class="small mute" id="stoInfo">Calculando…</div></div>`;
+  setTimeout(async()=>{const i=await storageInfo(),el=$('#stoInfo');if(el&&i)el.innerHTML=`Lumi ocupa <b>${MB(i.used)}</b> en este dispositivo. Espacio disponible para la app: ${MB(i.quota)}.`},50);
   h+=`<div class="card"><h2>Copias de seguridad</h2><p class="small mute" style="margin:0 0 12px">Si borras los datos del navegador (o tienes activado en Brave "borrar datos al salir"), se pierde todo. Haz una copia de vez en cuando y guárdala donde quieras.</p>
   <div class="row"><button class="btn block" data-act="export">⬇ Exportar copia</button><button class="btn ghost block" data-act="import">⬆ Importar</button></div></div>`;
   h+=`<div class="card"><h2>Zona peligrosa</h2><button class="btn danger block" data-act="wipe">Borrar todos los datos</button></div>`;
@@ -922,7 +935,7 @@ async function toggleRec(){
     const st=await navigator.mediaDevices.getUserMedia({audio:true});const mr=new MediaRecorder(st);const ch=[];
     mr.ondataavailable=e=>{if(e.data.size)ch.push(e.data)};
     mr.onstop=async()=>{st.getTracks().forEach(t=>t.stop());const dur=Math.round((Date.now()-rec.t0)/1000);rec=null;
-      if(ch.length){const blob=new Blob(ch,{type:mr.mimeType||'audio/webm'});const id=await putMedia(blob);const n=new Date();S.recs.unshift({id:uid(),date:ymd(),time:pad2(n.getHours())+':'+pad2(n.getMinutes()),media:id,dur});save();toast('Grabación guardada')}
+      if(ch.length){const blob=new Blob(ch,{type:mr.mimeType||'audio/webm'});const id=await putMedia(blob);setTimeout(mediaUpload,3000);const n=new Date();S.recs.unshift({id:uid(),date:ymd(),time:pad2(n.getHours())+':'+pad2(n.getMinutes()),media:id,dur});save();toast('Grabación guardada')}
       render()};
     mr.start();rec={mr,t0:Date.now()};render();
   }catch(e){toast('No se puede grabar en este navegador')}
@@ -1037,6 +1050,11 @@ const ACT={
     try{await gh('GET','/gists?per_page=1',null,t);setSyncCfg({token:t,pass:p});syncMsg='';toast('Llave correcta ✓');await syncNow(true)}
     catch(e){toast('⚠️ '+e.message);el.disabled=false;el.textContent='Activar sincronización'}render()},
   syncNow:()=>syncNow(true),
+  mediaToggle:async()=>{const c=syncCfg();if(c.media){c.media=false;c.cloudOnly=false;setSyncCfg(c);render();return}
+    toast('Comprobando permisos…');c.media=true;setSyncCfg(c);
+    try{await ensureRepo();toast('Almacén privado listo ✓');render();mediaUpload()}catch(e){const d=syncCfg();d.media=false;setSyncCfg(d);upMsg='';toast('⚠️ '+e.message);render()}},
+  cloudOnly:()=>{const c=syncCfg();c.cloudOnly=!c.cloudOnly;setSyncCfg(c);render();if(c.cloudOnly){toast('Liberando espacio…');mediaUpload()}},
+  mediaNow:()=>mediaUpload(),
   syncUndo:()=>{let p=null;try{p=JSON.parse(localStorage.getItem('lumi_prev')||'null')}catch(e){}if(!p)return;
     if(!confirm('¿Volver a como estaba este dispositivo antes de la última sincronización?'))return;
     S=Object.assign(JSON.parse(JSON.stringify(DEF)),p.state);lastJSON='';save();localStorage.removeItem('lumi_prev');render();toast('Restaurado ✓')},
@@ -1237,7 +1255,7 @@ const ACT={
   key:el=>{const k=el.dataset.k;if(k==='del')pinBuf=pinBuf.slice(0,-1);else if(pinBuf.length<4)pinBuf+=k;drawDots();
     if(pinBuf.length===4){if(hashPin(pinBuf)===S.settings.pin){$('#lock').classList.add('hidden');pinBuf=''}else{const p=$('#dots');p.classList.remove('shake');void p.offsetWidth;p.classList.add('shake');$('#lockMsg').textContent='PIN incorrecto';setTimeout(()=>{pinBuf='';drawDots()},350)}}},
   export:async()=>{toast('Preparando copia…');const ids=[...S.journal.map(e=>e.photo),...S.wardrobe.map(w=>w.photo),...S.recs.map(r=>r.media),...S.measures.flatMap(m=>m.fotos?Object.values(m.fotos):[])].filter(Boolean);const media={};
-    for(const id of ids){try{const b=await getMedia(id);if(b)media[id]=await new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.readAsDataURL(b)})}catch(e){}}
+    for(const id of ids){try{const b=await getMediaAny(id);if(b)media[id]=await new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.readAsDataURL(b)})}catch(e){}}
     const blob=new Blob([JSON.stringify({app:'lumi',v:1,state:{...S,settings:{...S.settings,aiKey:''}},media})],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`${S.settings.discreet?'notas':'lumi'}-copia-${ymd()}.json`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000)},
   import:()=>$('#importFile').click(),
   wipe:async()=>{if(!confirm('Se borrará TODO: diario, fotos, grabaciones, tareas… ¿Seguro?'))return;if(!confirm('Última confirmación. No se puede deshacer.'))return;
@@ -1296,9 +1314,38 @@ function mergeState(L,R){const newerL=(L._mod||0)>=(R._mod||0);const out={...(ne
   for(const k of new Set([...Object.keys(L),...Object.keys(R)])){const a=L[k],b=R[k];
     if(Array.isArray(a)||Array.isArray(b))out[k]=mergeArr(a,b,newerL);
     else if(k!=='settings'&&a&&b&&typeof a==='object'&&typeof b==='object'&&Object.values({...a,...b}).every(v=>Array.isArray(v))){const o={};for(const d of new Set([...Object.keys(a),...Object.keys(b)]))o[d]=[...new Set([...(a[d]||[]),...(b[d]||[])])];out[k]=o}}
+  ['cloudMedia','guides'].forEach(k=>{if(L[k]||R[k])out[k]={...(newerL?R[k]:L[k]),...(newerL?L[k]:R[k])}});
   out.settings={...(newerL?R.settings:L.settings),...(newerL?L.settings:R.settings)};LOCAL_SETTINGS.forEach(k=>{if(L.settings[k]!==undefined)out.settings[k]=L.settings[k]});
   return out}
 let syncing=false,syncTimer=null,syncMsg='';
+/* ---- Fotos y audios en la nube (repo privado, cifrado) ---- */
+const MEDIA_REPO='notas-data';let ghLogin=null,mKey=null,mKeyPass='',upBusy=false,upMsg='',upDone=0,upTotal=0;
+async function ghFetch(method,path,opts={}){const c=syncCfg();return fetch('https://api.github.com'+path,{method,cache:'no-store',headers:{'Authorization':'Bearer '+c.token,'Accept':opts.raw?'application/vnd.github.raw':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28',...(opts.body?{'Content-Type':'application/json'}:{})},body:opts.body?JSON.stringify(opts.body):undefined})}
+async function ghUser(){if(ghLogin)return ghLogin;const r=await ghFetch('GET','/user');if(!r.ok)throw new Error('La llave de GitHub no es válida');ghLogin=(await r.json()).login;return ghLogin}
+async function ensureRepo(){const c=syncCfg();if(c.repoOk)return;const o=await ghUser();const r=await ghFetch('GET',`/repos/${o}/${MEDIA_REPO}`);
+  if(r.status===404){const k=await ghFetch('POST','/user/repos',{body:{name:MEDIA_REPO,private:true,auto_init:true,description:'notas'}});if(!k.ok)throw new Error(k.status===403||k.status===404?'Tu llave necesita también el permiso "repo"':'No se pudo crear el almacén ('+k.status+')')}
+  else if(!r.ok)throw new Error('Tu llave necesita también el permiso "repo"');
+  else{const j=await r.json();if(!j.private)throw new Error('El repositorio '+MEDIA_REPO+' existe pero es público. Hazlo privado en GitHub.')}
+  c.repoOk=true;setSyncCfg(c)}
+async function mediaKey(){const p=syncCfg().pass;if(mKey&&mKeyPass===p)return mKey;mKey=await kdf(p,new TextEncoder().encode('notas-media-v1'));mKeyPass=p;return mKey}
+async function encBlob(blob){const iv=crypto.getRandomValues(new Uint8Array(12));const ct=new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv},await mediaKey(),await blob.arrayBuffer()));const o=new Uint8Array(12+ct.length);o.set(iv);o.set(ct,12);return o}
+async function decBlob(u8,type){const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:u8.slice(0,12)},await mediaKey(),u8.slice(12));return new Blob([pt],{type:type||'application/octet-stream'})}
+const cpath=async id=>`/repos/${await ghUser()}/${MEDIA_REPO}/contents/m/${id}.bin`;
+async function cloudPut(id,blob){const r=await ghFetch('PUT',await cpath(id),{body:{message:'n',content:u8b64(await encBlob(blob))}});if(!r.ok&&r.status!==422)throw new Error('Error subiendo ('+r.status+')')}
+async function cloudGet(id){const r=await ghFetch('GET',await cpath(id),{raw:true});if(!r.ok)return null;const info=(S.cloudMedia||{})[id]||{};return decBlob(new Uint8Array(await r.arrayBuffer()),info.t)}
+async function cloudDel(id){try{const p=await cpath(id);const r=await ghFetch('GET',p);if(!r.ok)return;const j=await r.json();await ghFetch('DELETE',p,{body:{message:'d',sha:j.sha}})}catch(e){}}
+async function getMediaAny(id){let b=null;try{b=await getMedia(id)}catch(e){}if(!b&&S.cloudMedia&&S.cloudMedia[id]&&syncOn()){try{b=await cloudGet(id)}catch(e){}}return b}
+function mediaIds(){return [...S.journal.map(e=>e.photo),...S.wardrobe.map(w=>w.photo),...S.recs.map(r=>r.media),...S.measures.flatMap(m=>m.fotos?Object.values(m.fotos):[])].filter(Boolean)}
+async function mediaUpload(){const c=syncCfg();if(!c.media||!syncOn()||upBusy||!navigator.onLine)return;upBusy=true;upMsg='';
+  try{await ensureRepo();S.cloudMedia=S.cloudMedia||{};const ids=mediaIds();const todo=[];for(const id of ids){if(S.cloudMedia[id])continue;let b=null;try{b=await getMedia(id)}catch(e){}if(b)todo.push([id,b])}
+    upTotal=todo.length;upDone=0;if(view==='ajustes'&&todo.length)render();
+    for(const [id,b] of todo){await cloudPut(id,b);S.cloudMedia[id]={t:b.type||''};upDone++;save();if(c.cloudOnly){delete urlCache[id];await delLocalMedia(id)}if(view==='ajustes')render()}
+    if(c.cloudOnly){for(const id of ids){if(S.cloudMedia[id]){let b=null;try{b=await getMedia(id)}catch(e){}if(b){delete urlCache[id];await delLocalMedia(id)}}}}
+  }catch(e){upMsg='⚠️ '+(e.message||'No se pudieron subir las fotos')}
+  upBusy=false;if(view==='ajustes')render()}
+async function storageInfo(){try{const e=await navigator.storage.estimate();return {used:e.usage||0,quota:e.quota||0}}catch(e){return null}}
+const MB=b=>(b/1048576).toFixed(b<10485760?1:0)+' MB';
+try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
 function syncSoon(){if(!syncOn())return;clearTimeout(syncTimer);syncTimer=setTimeout(()=>syncNow(),6000)}
 async function syncNow(manual){
   if(!syncOn()||syncing||!navigator.onLine)return;if(!(window.crypto&&crypto.subtle)){syncMsg='Este navegador no permite cifrar aquí: abre la app desde su dirección https.';return}
@@ -1324,7 +1371,7 @@ async function syncNow(manual){
       else{const g=await gh('POST','/gists',{description:GIST_DESC,public:false,files:{[GIST_FILE]:{content}}});c.gist=g.id}
       c.lastRemote=S._mod}
     else c.lastRemote=remote._mod;
-    c.lastLocal=S._mod;c.lastSync=Date.now();setSyncCfg(c);syncMsg='';
+    c.lastLocal=S._mod;c.lastSync=Date.now();setSyncCfg(c);syncMsg='';setTimeout(mediaUpload,500);
     if(changed){render();toast('🔄 Datos sincronizados')}else if(manual)toast('Sincronizado ✓');
   }catch(e){syncMsg='⚠️ '+(e.message||'No se pudo sincronizar');setSyncCfg(c);if(manual)toast(syncMsg)}
   syncing=false;if(view==='ajustes')render()}
