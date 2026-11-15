@@ -92,6 +92,30 @@ textarea{min-height:110px;resize:vertical;font-family:var(--sans)}
 .drawn{background:linear-gradient(135deg,#3b1e34,#6a3a5f);color:#fff;border-radius:18px;padding:20px;margin:12px 0;font:500 20px/1.35 var(--serif);text-align:center}
 .recdot{display:inline-block;width:10px;height:10px;border-radius:50%;background:#e23b5a;margin-right:8px;animation:bl 1s infinite}@keyframes bl{50%{opacity:.2}}
 audio{width:100%;height:38px;margin-top:6px}
+/* ===== Modo oscuro ===== */
+html.dark{--bg:#17101a;--card:#221823;--card2:#2c1f2c;--ink:#f3e6ee;--mute:#a893a3;--rose:#d8698f;--rose-d:#f39abb;--rose-l:#3d2433;--lila:#a487d4;--lila-l:#2e2540;--line:#382835;color-scheme:dark}
+html.dark body{background:radial-gradient(1100px 480px at 110% -10%,#3a1a2c 0,transparent 60%),radial-gradient(900px 400px at -25% 0,#261d3d 0,transparent 55%),var(--bg)}
+html.dark .card{box-shadow:none}
+html.dark .chk,html.dark input,html.dark textarea,html.dark select,html.dark .chip,html.dark .witem,html.dark .tile,html.dark .moods button,html.dark .pad button:not(.n),html.dark .msg.a,html.dark .stat div{background:var(--card2);color:var(--ink);border-color:var(--line)}
+html.dark .tile,html.dark .pad button{box-shadow:none}
+html.dark .chip.on{background:var(--rose);border-color:var(--rose);color:#fff}
+html.dark .chk.on{background:linear-gradient(90deg,#3d2232,var(--card2))}
+html.dark .chk.sel{background:var(--rose-l);border-color:var(--rose)}
+html.dark .chk .tick{border-color:#5a4352}
+html.dark .nav{background:rgba(23,16,26,.92)}
+html.dark .btn.soft{background:#3a2b37;color:var(--ink)}
+html.dark .btn.danger{background:#4a2228;color:#ff9fa8}
+html.dark .warn{background:#33281a!important;border-color:#5a4420!important;color:#f1d29c!important}
+html.dark .sw{background:#4a3846}
+html.dark .sw.on{background:var(--rose)}
+html.dark .week i,html.dark .bar{background:#382835}
+html.dark .lock{background:radial-gradient(800px 500px at 50% 0,#3a1a2c,transparent),var(--bg)}
+html.dark .sheet-bg{background:rgba(0,0,0,.6)}
+html.dark svg circle[stroke="#f3e3ea"]{stroke:#382835}
+html.dark svg circle[fill="#fff"]{fill:var(--card)}
+html.dark svg text{fill:var(--mute)}
+html.dark svg text[font-size="19"]{fill:var(--ink)}
+html.dark #toast{background:#f3e6ee;color:#17101a}
 .msg{max-width:86%;padding:10px 14px;border-radius:18px;margin:8px 0;white-space:pre-wrap;line-height:1.45}
 .msg.u{margin-left:auto;background:var(--rose);color:#fff;border-bottom-right-radius:6px}
 .msg.a{background:#fff;border:1px solid var(--line);border-bottom-left-radius:6px}
@@ -279,7 +303,11 @@ let view='hoy',dseg='entradas',metric='cintura',wf='todo',ilvl=0,drawn=null;
 const VIEWS={hoy:vHoy,diario:vDiario,rutinas:vRutinas,voz:vVoz,mas:vMas,armario:vArmario,salud:vSalud,intimo:vIntimo,retos:vRetos,chat:vChat,ia:vIA,ajustes:vAjustes};
 const MAS=['armario','salud','intimo','retos','ajustes','chat','ia'];
 function go(v){if(v!==view)stopMic();view=v;drawn=null;render();window.scrollTo(0,0)}
+function applyTheme(){const t=S.settings.theme||'dark';const dark=t==='dark'||(t==='auto'&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches);
+  document.documentElement.classList.toggle('dark',dark);const m=document.querySelector('meta[name=theme-color]');if(m)m.content=dark?'#17101a':'#fbf5f3'}
+if(window.matchMedia)matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{if(S.settings.theme==='auto')applyTheme()});
 function render(){
+  applyTheme();
   $('#main').innerHTML=VIEWS[view]();
   document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===view||(b.dataset.v==='mas'&&MAS.includes(view))));
   document.title=S.settings.discreet?'Notas':'Lumi';
@@ -446,6 +474,8 @@ function vRetos(){
 function vAjustes(){
   let h=head('Ajustes','Privacidad y copias','mas');
   h+=`<div class="card"><h2>Tu nombre</h2><input id="setName" placeholder="¿Cómo quieres que te llame?" value="${esc(S.settings.name)}" data-chg="name">${nameUI('setName')}</div>`;
+  const th=S.settings.theme||'dark';
+  h+=`<div class="card"><h2>Apariencia</h2><div class="chips" style="margin:0">${[['light','☀️ Claro'],['dark','🌙 Oscuro'],['auto','📱 Automático']].map(o=>`<button class="chip ${th===o[0]?'on':''}" data-act="setTheme" data-t="${o[0]}">${o[1]}</button>`).join('')}</div></div>`;
   const st=STAGES[S.stage];
   h+=`<div class="card"><h2>Mi etapa</h2><div class="li"><div class="grow"><b>${st?st.e+' '+st.n:'Sin elegir'}</b><div class="mute small">${st?st.d:''}</div></div><button class="btn sm" data-act="pickStage">Cambiar</button></div></div>`;
   h+=`<div class="card"><h2>Secciones</h2><p class="small mute" style="margin:0 0 6px">Enciende solo lo que te sirva ahora. Puedes activar el resto cuando quieras; no se borra nada.</p>${SECS.map(s=>`<div class="li"><span style="font-size:20px">${s[1]}</span><div class="grow">${s[2]}</div><button class="sw ${secOn(s[0])?'on':''}" data-act="togSec" data-k="${s[0]}"></button></div>`).join('')}</div>`;
@@ -554,6 +584,7 @@ const ACT={
   saveAI:async el=>{const k=fv('aiKey');if(!k)return toast('Pega tu clave');S.settings.aiKey=k;S.settings.aiModel=fv('aiModel');S.aiTip=null;save();el.textContent='Probando…';el.disabled=true;
     try{const t=await ai([{role:'user',content:'Responde solo con la palabra: OK'}],20,0);toast(t?'¡Conectada y respondiendo! ✨':'Clave válida ✓ (el modelo no respondió, prueba en el chat)')}catch(e){toast('⚠️ '+e.message)}render()},
   delAI:()=>{S.settings.aiKey='';S.aiTip=null;save();render()},
+  setTheme:el=>{S.settings.theme=el.dataset.t;save();render()},
   sugName:el=>{const box=document.getElementById(el.dataset.box);const pick=[...NAMES].sort(()=>Math.random()-.5).slice(0,8);
     box.innerHTML=pick.map(n=>`<button class="chip" data-act="useName" data-n="${n}" data-in="${el.dataset.in}">${n}</button>`).join('');el.textContent='🎲 Otros nombres'},
   useName:el=>{const i=document.getElementById(el.dataset.in);i.value=el.dataset.n;el.parentNode.querySelectorAll('.chip').forEach(c=>c.classList.toggle('on',c===el));
