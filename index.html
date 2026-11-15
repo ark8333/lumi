@@ -122,6 +122,17 @@ html.dark svg circle[fill="#fff"]{fill:var(--card)}
 html.dark svg text{fill:var(--mute)}
 html.dark svg text[font-size="19"]{fill:var(--ink)}
 html.dark #toast{background:#f3e6ee;color:#17101a}
+.quick{display:grid;grid-template-columns:repeat(4,1fr);gap:12px 8px;margin:0 0 16px}
+.quick button{border:0;background:none;color:var(--ink);font:600 11.5px var(--sans);display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;padding:0}
+.quick i{font-style:normal;width:58px;height:58px;border-radius:20px;display:grid;place-items:center;font-size:26px;border:1px solid var(--line);transition:transform .15s}
+.quick button:active i{transform:scale(.92)}
+.hd{display:flex;align-items:flex-end;gap:14px}.hd .hdi{flex:none;width:52px;height:52px;border-radius:18px;display:grid;place-items:center;font-size:26px;background:linear-gradient(135deg,var(--rose-l),var(--lila-l));border:1px solid var(--line)}
+.hd .hdt{flex:1;min-width:0}
+.nav button span{padding:3px 18px;border-radius:99px;transition:background .2s}
+.nav button.on span{background:var(--rose-l)}
+@keyframes pop{0%{transform:scale(.5)}60%{transform:scale(1.25)}100%{transform:scale(1)}}
+.chk.pop .tick{animation:pop .3s ease}
+.body{display:block;width:100%;max-width:360px;margin:0 auto}
 .msg{max-width:86%;padding:10px 14px;border-radius:18px;margin:8px 0;white-space:pre-wrap;line-height:1.45}
 .msg.u{margin-left:auto;background:var(--rose);color:#fff;border-bottom-right-radius:6px}
 .msg.a{background:#fff;border:1px solid var(--line);border-bottom-left-radius:6px}
@@ -162,8 +173,8 @@ html.dark #toast{background:#f3e6ee;color:#17101a}
 
 <script>
 'use strict';
-const APP_V='1.13';
-const APP_NEWS='Fotos en tus medidas (frente, perfil y espalda) y comparación por postura en Progreso';
+const APP_V='1.14';
+const APP_NEWS='Más visual: accesos rápidos en Hoy, tu cuerpo dibujado con tus medidas, iconos por sección y menú más claro';
 /* ================= Datos ================= */
 const KEY='lumi_v1';
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
@@ -257,7 +268,8 @@ const fmtLong=d=>d.toLocaleDateString('es-ES',{weekday:'long',day:'numeric',mont
 const mmss=s=>pad2(Math.floor(s/60))+':'+pad2(s%60);
 const fv=id=>{const e=document.getElementById(id);return e?e.value.trim():''};
 function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('on'),2200)}
-function head(title,sub,back){return `<div class="hd">${back?`<button class="back" data-act="go" data-v="${back}">‹ Volver</button>`:''}<div class="sub">${sub||''}</div><h1>${title}</h1></div>`}
+const VICON={hoy:'🌸',diario:'📔',rutinas:'✨',voz:'🎤',mas:'💗',armario:'👗',salud:'💊',intimo:'🔒',retos:'🌟',ajustes:'⚙️',chat:'💬',ia:'🤖',entreno:'🏋️',progreso:'📈'};
+function head(title,sub,back){const ic=typeof view!=='undefined'&&view!=='hoy'?VICON[view]:'';return `${back?`<button class="back" style="border:0;background:none;color:var(--rose-d);font:600 14px var(--sans);padding:0;margin:0 0 8px;cursor:pointer" data-act="go" data-v="${back}">‹ Volver</button>`:''}<div class="hd">${ic?`<div class="hdi">${ic}</div>`:''}<div class="hdt"><div class="sub">${sub||''}</div><h1>${title}</h1></div></div>`}
 function sheet(html){$('#sheetCard').innerHTML=html;$('#sheet').classList.remove('hidden');$('#sheetCard').scrollTop=0}
 function closeSheet(){$('#sheet').classList.add('hidden');if(timer){clearInterval(timer);timer=null}}
 function weekStart(d){d=new Date(d||new Date());const k=(d.getDay()+6)%7;d.setDate(d.getDate()-k);return ymd(d)}
@@ -269,7 +281,8 @@ function isDone(r){
   return (S.checks[ymd()]||[]).includes(r.id)
 }
 function streak(){let n=0;const d=new Date();if(!(S.checks[ymd(d)]||[]).length)d.setDate(d.getDate()-1);while((S.checks[ymd(d)]||[]).length){n++;d.setDate(d.getDate()-1)}return n}
-function routineBtn(r){const ok=isDone(r);const b=`<button class="chk ${ok?'on':''}" ${hasAI()?'style="flex:1;margin:0"':''} data-act="toggleR" data-id="${r.id}"><span class="ic">${esc(r.icon)}</span><span class="tx">${esc(r.name)}${r.freq==='semanal'?'<small>Esta semana</small>':''}</span><span class="tick">${ok?'✓':''}</span></button>`;
+let lastTog='';
+function routineBtn(r){const ok=isDone(r);const b=`<button class="chk ${ok?'on':''} ${ok&&r.id===lastTog?'pop':''}" ${hasAI()?'style="flex:1;margin:0"':''} data-act="toggleR" data-id="${r.id}"><span class="ic">${esc(r.icon)}</span><span class="tx">${esc(r.name)}${r.freq==='semanal'?'<small>Esta semana</small>':''}</span><span class="tick">${ok?'✓':''}</span></button>`;
   return hasAI()?`<div style="display:flex;gap:8px;align-items:stretch;margin-bottom:8px">${b}<button class="btn sm ghost" style="flex:none" data-act="rutHow" data-id="${r.id}">Cómo</button></div>`:b}
 /* ================= IA (OpenRouter) ================= */
 const hasAI=()=>!!S.settings.aiKey;
@@ -564,6 +577,11 @@ function vHoy(){
     <div style="flex:1;min-width:0"><div style="font:500 20px var(--serif)">${dn} de ${tot} hechas</div><div class="mute small">🔥 Racha: ${st} día${st===1?'':'s'}</div>
     ${stg?`<button style="all:unset;cursor:pointer;display:block;width:100%;margin-top:6px" data-act="go" data-v="retos"><div class="small">${stg.e} ${stg.n} · ${Math.min(dn2,STAGE_GOAL)}/${STAGE_GOAL} retos</div><div class="bar" style="margin:4px 0 0;height:6px"><i style="width:${p2*100}%"></i></div></button>`:''}</div></div>
     ${stg&&p2>=1&&S.stage<4?`<button class="btn block" style="margin-top:12px" data-act="nextStage">¿Lista? Pasar a ${STAGES[S.stage+1].e} ${STAGES[S.stage+1].n}</button>`:''}</div>`;
+  const Q=[['📏','＋ Medidas','newMeasure','','diario','#f7d9e3'],['📔','＋ Diario','newEntry','','diario','#e9def7'],['🏋️','Entreno','go','entreno','entreno','#fde4cf'],['🎤','Voz','go','voz','voz','#d9eef7'],
+    ['✨','Valeria','go','ia','','#f7d9e3'],['👗','Armario','go','armario','armario','#e9def7'],['📈','Progreso','go','progreso','','#dff3e4'],['🌟','Retos','go','retos','','#fdf0c8']]
+    .filter(q=>(!q[4]||secOn(q[4]))&&(q[3]!=='ia'||hasAI())).slice(0,8);
+  const dk=document.documentElement.classList.contains('dark');
+  h+=`<div class="quick">${Q.map(q=>`<button data-act="${q[2]}" ${q[3]?`data-v="${q[3]}"`:''}><i style="background:${dk?'var(--card2)':q[5]}">${q[0]}</i>${q[1]}</button>`).join('')}</div>`;
   if(hasAI()){const tip=S.aiTip&&S.aiTip.date===t?S.aiTip.text:'';if(!tip)loadTip();
     h+=`<div class="card" style="padding:14px 18px"><div class="row" style="align-items:flex-start;gap:10px"><span style="font-size:20px">💌</span><div style="flex:1;font:500 16px/1.4 var(--serif)">${tip?esc(tip):'<span class="mute">Pensando algo para ti…</span>'}</div></div></div>`;
     const prevW=(()=>{const d=new Date();d.setDate(d.getDate()-7);return weekStart(d)})();
@@ -606,12 +624,27 @@ function vDiario(){
     h+=`<div class="card">${es.length?es.map(e=>`<div class="entry"><div class="row between"><div><span style="font-size:22px">${e.mood||''}</span> <b>${fmt(e.date)}</b></div><div><button class="x" data-act="newEntry" data-id="${e.id}">✎</button><button class="x" data-act="delEntry" data-id="${e.id}">✕</button></div></div>${e.text?`<div class="txt">${esc(e.text)}</div>`:''}${e.photo?`<img class="photo" data-media="${e.photo}" alt="">`:''}</div>`).join(''):'<div class="empty">Aún no hay entradas. Escribe cómo te sientes, qué has probado, fotos de tu evolución…</div>'}</div>`;
   }else{
     const ms=[...S.measures].sort((a,b)=>a.date<b.date?1:-1),last=ms[0];
-    if(last&&last.cintura&&last.cadera)h+=`<div class="card"><div class="stat"><div><b>${last.cintura}</b><span>cintura</span></div><div><b>${last.cadera}</b><span>cadera</span></div><div><b>${(last.cintura/last.cadera).toFixed(2)}</b><span>cintura/cadera</span></div></div></div>`;
+    if(ms.length)h+=`<div class="card"><h2>Tu cuerpo hoy <button class="btn sm" data-act="newMeasure">＋ Medir</button></h2>${bodySVG()}</div>`;
     h+=`<div class="card"><h2>Evolución</h2><div class="chips">${MF.map(m=>`<button class="chip ${metric===m[0]?'on':''}" data-act="metric" data-m="${m[0]}">${m[1]}</button>`).join('')}</div>${chart(metric)}</div>`;
     h+=`<div class="card"><h2>Registros <button class="btn sm" data-act="newMeasure">＋ Añadir</button></h2>${ms.length?ms.map(m=>`<div class="li" style="flex-wrap:wrap"><div class="grow"><b>${fmt(m.date)}</b><div class="mute small">${MF.filter(f=>m[f[0]]).map(f=>`${f[1]} ${m[f[0]]} ${f[2]}`).join(' · ')||'Solo fotos'}</div></div><button class="btn sm ghost" data-act="newMeasure" data-id="${m.id}">${m.fotos?'✎':'📸 Fotos'}</button>${m.fotos?`<div style="display:flex;gap:6px;width:100%;margin-top:8px">${POSES.filter(p=>m.fotos[p[0]]).map(p=>`<img data-media="${m.fotos[p[0]]}" alt="${p[1]}" style="width:64px;height:84px;object-fit:cover;border-radius:10px;background:var(--rose-l)">`).join('')}</div>`:''}</div>`).join(''):'<div class="empty">Sin medidas todavía.</div>'}</div>`;
   }
   return h;
 }
+function bodySVG(){
+  const asc=[...S.measures].sort((a,b)=>a.date<b.date?-1:1);
+  const val=k=>{const w=asc.filter(m=>m[k]!=null&&m[k]!=='');if(!w.length)return null;const a=+w[0][k],b=+w[w.length-1][k];return {v:b,d:w.length>1?+(b-a).toFixed(1):null}};
+  const L=[['pecho','Pecho',126],['bajo','Bajo pecho',146],['cintura','Cintura',174],['cadera','Cadera',214]];
+  let prev=-99;
+  const lines=L.map(([k,n,y])=>{const x=val(k);if(!x)return '';const ly=Math.max(y,prev+36);prev=ly;const dc=x.d==null?'':`<tspan fill="${x.d<0?'var(--lila)':x.d>0?'var(--rose-d)':'var(--mute)'}" font-weight="700"> ${x.d>0?'+':''}${x.d}</tspan>`;
+    return `<line x1="46" x2="172" y1="${y}" y2="${y}" stroke="var(--rose)" stroke-width="1.5" stroke-dasharray="4 4"/><circle cx="172" cy="${y}" r="3.5" fill="var(--rose)"/><path d="M172 ${y} L186 ${ly}" stroke="var(--rose)" stroke-width="1.2" fill="none"/>
+    <text x="192" y="${ly-3}" font-size="11" fill="var(--mute)" font-family="system-ui,sans-serif">${n}</text><text x="192" y="${ly+14}" font-size="15" fill="var(--ink)" font-family="system-ui,sans-serif" font-weight="600">${x.v} cm${dc}</text>`}).join('');
+  const p=val('peso'),c=val('cintura'),h=val('cadera');
+  return `<svg class="body" viewBox="0 0 330 290"><defs><linearGradient id="bg1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c4577e" stop-opacity=".35"/><stop offset="1" stop-color="#8b6bbf" stop-opacity=".3"/></linearGradient></defs>
+  <circle cx="110" cy="32" r="19" fill="url(#bg1)" stroke="var(--rose)" stroke-width="1.5"/>
+  <path d="M100 52 C100 60,98 64,92 66 C78 70,66 74,62 86 C58 100,62 118,70 130 C76 148,86 160,88 174 C90 188,74 200,70 214 C66 232,74 248,84 262 L136 262 C146 248,154 232,150 214 C146 200,130 188,132 174 C134 160,144 148,150 130 C158 118,162 100,158 86 C154 74,142 70,128 66 C122 64,120 60,120 52 Z" fill="url(#bg1)" stroke="var(--rose)" stroke-width="1.5"/>
+  ${lines}</svg>
+  <div class="stat" style="margin-top:8px">${p?`<div><b>${p.v}</b><span>kg${p.d!=null?' ('+(p.d>0?'+':'')+p.d+')':''}</span></div>`:''}${c&&h?`<div><b>${(c.v/h.v).toFixed(2)}</b><span>cintura / cadera</span></div>`:''}<div><b>${S.measures.length}</b><span>registros</span></div></div>
+  <p class="small mute" style="text-align:center;margin:8px 0 0">Los números de color son el cambio desde tu primera medida.</p>`}
 function chart(key){
   const f=MF.find(m=>m[0]===key);
   const pts=S.measures.filter(m=>m[key]!==undefined&&m[key]!==''&&m[key]!==null).sort((a,b)=>a.date<b.date?-1:1);
@@ -801,7 +834,7 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden){hiddenAt=D
 const ACT={
   go:el=>go(el.dataset.v),
   close:()=>closeSheet(),
-  toggleR:el=>{const id=el.dataset.id,r=S.routines.find(x=>x.id===id),t=ymd();
+  toggleR:el=>{lastTog=el.dataset.id;setTimeout(()=>lastTog='',400);const id=el.dataset.id,r=S.routines.find(x=>x.id===id),t=ymd();
     if(r.freq==='semanal'&&isDone(r)){const ws=weekStart();Object.keys(S.checks).forEach(d=>{if(d>=ws)S.checks[d]=S.checks[d].filter(x=>x!==id)})}
     else{const a=S.checks[t]||(S.checks[t]=[]);const k=a.indexOf(id);k<0?a.push(id):a.splice(k,1)}
     save();render()},
