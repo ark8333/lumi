@@ -162,8 +162,8 @@ html.dark #toast{background:#f3e6ee;color:#17101a}
 
 <script>
 'use strict';
-const APP_V='1.12';
-const APP_NEWS='Antes y después, resumen semanal, Valeria con memoria, IA más estable y Hoy más limpio';
+const APP_V='1.13';
+const APP_NEWS='Fotos en tus medidas (frente, perfil y espalda) y comparación por postura en Progreso';
 /* ================= Datos ================= */
 const KEY='lumi_v1';
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
@@ -393,8 +393,12 @@ function vProgreso(){
   h+=`<div class="card"><div class="stat"><div><b>${days}</b><span>días contigo</span></div><div><b>${S.retosLog.length}</b><span>retos</span></div><div><b>${totR}</b><span>rutinas</span></div></div><div class="stat" style="margin-top:10px"><div><b>${S.planDone||0}</b><span>entrenos</span></div><div><b>${voz}</b><span>min de voz</span></div><div><b>${S.stage||1}/4</b><span>etapa</span></div></div></div>`;
   if(hasAI()){const w=S.weekly&&S.weekly.week===weekStart()?S.weekly:null;
     h+=`<div class="card"><h2>📊 Tu semana <button class="btn sm ghost" data-act="weekly">${weeklyLoading?'Escribiendo…':w?'Actualizar':'Pedir resumen'}</button></h2>${w?`<div style="font:500 16px/1.5 var(--serif);white-space:pre-wrap">${esc(w.text)}</div>`:'<div class="small mute">Valeria te escribe un resumen cada domingo. Puedes pedírselo cuando quieras.</div>'}</div>`}
-  const ph=S.journal.filter(e=>e.photo).sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:(a.ts||0)-(b.ts||0));
-  h+=`<div class="card"><h2>📸 Fotos</h2>${ph.length>=2?`<div class="grid2" style="gap:10px">${[ph[0],ph[ph.length-1]].map((e,i)=>`<div><div class="small mute" style="margin-bottom:4px">${i?'Ahora':'Antes'} · ${fmt(e.date)}</div><img class="photo" style="margin:0;aspect-ratio:3/4;max-height:none" data-media="${e.photo}" alt=""></div>`).join('')}</div>`:'<div class="empty">Añade fotos en tu Diario. Cuando tengas dos, aquí verás la primera al lado de la última.</div>'}</div>`;
+  const pair=(a,b,la)=>`<div class="grid2" style="gap:10px">${[a,b].map((e,i)=>`<div><div class="small mute" style="margin-bottom:4px">${i?'Ahora':'Antes'} · ${fmt(e.date)}</div><img class="photo" style="margin:0;aspect-ratio:3/4;max-height:none" data-media="${e.id}" alt=""></div>`).join('')}</div>`;
+  const msF=[...S.measures].filter(m=>m.fotos).sort((a,b)=>a.date<b.date?-1:1);
+  const bloques=POSES.map(p=>{const l=msF.filter(m=>m.fotos[p[0]]).map(m=>({date:m.date,id:m.fotos[p[0]]}));return l.length>=2?`<div style="margin-bottom:14px"><b>${p[1]}</b>${pair(l[0],l[l.length-1])}</div>`:''}).join('');
+  const ph=S.journal.filter(e=>e.photo).sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:(a.ts||0)-(b.ts||0)).map(e=>({date:e.date,id:e.photo}));
+  h+=`<div class="card"><h2>📸 Tu cuerpo</h2>${bloques||(msF.length?'<div class="empty">Ya tienes fotos en tus medidas. Cuando subas otras de la misma postura otro día, aquí verás el antes y el ahora.</div>':'<div class="empty">Sube fotos al apuntar tus medidas (Diario → Medidas → ＋ Añadir): de frente, de perfil y de espaldas. Aquí verás la primera al lado de la última.</div>')}</div>`;
+  if(ph.length>=2)h+=`<div class="card"><h2>📔 Fotos del diario</h2>${pair(ph[0],ph[ph.length-1])}</div>`;
   const ms=[...S.measures].sort((a,b)=>a.date<b.date?-1:1);
   const rows=MF.map(f=>{const w=ms.filter(m=>m[f[0]]);if(w.length<2)return '';const a=w[0][f[0]],b=w[w.length-1][f[0]],d=+(b-a).toFixed(1);
     return `<div class="li"><div class="grow"><b>${f[1]}</b><div class="small mute">${fmt(w[0].date)} → ${fmt(w[w.length-1].date)}</div></div><span>${a} → <b>${b}</b> ${f[2]}</span><span class="tag ${d<0?'l':''}" style="margin:0 0 0 8px">${d>0?'+':''}${d}</span></div>`}).join('');
@@ -591,6 +595,7 @@ function vRutinas(){
 }
 
 const MOODS=['🥰','😊','😌','✨','😐','😔','😢','😤'];
+const POSES=[['frente','De frente'],['perfil','De perfil'],['espalda','De espaldas']];
 const MF=[['peso','Peso','kg'],['pecho','Pecho','cm'],['bajo','Bajo pecho','cm'],['cintura','Cintura','cm'],['cadera','Cadera','cm']];
 function vDiario(){
   let h=head('Diario','Tu camino');
@@ -603,7 +608,7 @@ function vDiario(){
     const ms=[...S.measures].sort((a,b)=>a.date<b.date?1:-1),last=ms[0];
     if(last&&last.cintura&&last.cadera)h+=`<div class="card"><div class="stat"><div><b>${last.cintura}</b><span>cintura</span></div><div><b>${last.cadera}</b><span>cadera</span></div><div><b>${(last.cintura/last.cadera).toFixed(2)}</b><span>cintura/cadera</span></div></div></div>`;
     h+=`<div class="card"><h2>Evolución</h2><div class="chips">${MF.map(m=>`<button class="chip ${metric===m[0]?'on':''}" data-act="metric" data-m="${m[0]}">${m[1]}</button>`).join('')}</div>${chart(metric)}</div>`;
-    h+=`<div class="card"><h2>Registros <button class="btn sm" data-act="newMeasure">＋ Añadir</button></h2>${ms.length?ms.map(m=>`<div class="li"><div class="grow"><b>${fmt(m.date)}</b><div class="mute small">${MF.filter(f=>m[f[0]]).map(f=>`${f[1]} ${m[f[0]]} ${f[2]}`).join(' · ')}</div></div><button class="x" data-act="delMeasure" data-id="${m.id}">✕</button></div>`).join(''):'<div class="empty">Sin medidas todavía.</div>'}</div>`;
+    h+=`<div class="card"><h2>Registros <button class="btn sm" data-act="newMeasure">＋ Añadir</button></h2>${ms.length?ms.map(m=>`<div class="li" style="flex-wrap:wrap"><div class="grow"><b>${fmt(m.date)}</b><div class="mute small">${MF.filter(f=>m[f[0]]).map(f=>`${f[1]} ${m[f[0]]} ${f[2]}`).join(' · ')||'Solo fotos'}</div></div><button class="btn sm ghost" data-act="newMeasure" data-id="${m.id}">${m.fotos?'✎':'📸 Fotos'}</button>${m.fotos?`<div style="display:flex;gap:6px;width:100%;margin-top:8px">${POSES.filter(p=>m.fotos[p[0]]).map(p=>`<img data-media="${m.fotos[p[0]]}" alt="${p[1]}" style="width:64px;height:84px;object-fit:cover;border-radius:10px;background:var(--rose-l)">`).join('')}</div>`:''}</div>`).join(''):'<div class="empty">Sin medidas todavía.</div>'}</div>`;
   }
   return h;
 }
@@ -910,12 +915,21 @@ const ACT={
     if(!e.text&&!e.photo&&!e.mood)return toast('Escribe algo o añade una foto');
     if(old)Object.assign(old,e);else S.journal.push(e);save();closeSheet();if(view!=='diario'){view='diario';dseg='entradas'}render();toast('Guardado ✓')},
   delEntry:el=>{if(!confirm('¿Borrar esta entrada?'))return;const e=S.journal.find(x=>x.id===el.dataset.id);delMedia(e.photo);S.journal=S.journal.filter(x=>x!==e);save();render()},
-  newMeasure:()=>{sheet(`<h3>Nuevas medidas</h3><label class="f">Fecha</label><input type="date" id="mDate" value="${ymd()}"><div class="grid2">${MF.map(f=>`<div><label class="f">${f[1]} (${f[2]})</label><input type="number" step="0.1" inputmode="decimal" id="m_${f[0]}"></div>`).join('')}</div>
-    <p class="small mute">Rellena solo las que quieras. Mide siempre a la misma hora y de la misma forma.</p>
-    <div class="actions"><button class="btn soft" data-act="close">Cancelar</button><button class="btn" data-act="saveMeasure">Guardar</button></div>`)},
-  saveMeasure:()=>{const m={id:uid(),date:fv('mDate')||ymd()};let any=false;MF.forEach(f=>{const v=fv('m_'+f[0]).replace(',','.');if(v!==''&&!isNaN(v)){m[f[0]]=+v;any=true}});
-    if(!any)return toast('Pon al menos una medida');S.measures.push(m);save();closeSheet();view='diario';dseg='medidas';render();toast('Medidas guardadas ✓')},
-  delMeasure:el=>{if(!confirm('¿Borrar este registro?'))return;S.measures=S.measures.filter(x=>x.id!==el.dataset.id);save();render()},
+  newMeasure:el=>{const m=(el&&el.dataset&&S.measures.find(x=>x.id===el.dataset.id))||{};const fo=m.fotos||{};
+    sheet(`<h3>${m.id?'Editar medidas':'Nuevas medidas'}</h3><label class="f">Fecha</label><input type="date" id="mDate" value="${m.date||ymd()}"><div class="grid2">${MF.map(f=>`<div><label class="f">${f[1]} (${f[2]})</label><input type="number" step="0.1" inputmode="decimal" id="m_${f[0]}" value="${m[f[0]]!=null?m[f[0]]:''}"></div>`).join('')}</div>
+    <label class="f">📸 Fotos de tu cuerpo (opcional)</label>
+    <div class="grid2" style="grid-template-columns:repeat(3,1fr);gap:8px">${POSES.map(p=>`<label style="display:block;cursor:pointer"><div class="ph" id="mph_${p[0]}" style="aspect-ratio:3/4;border-radius:14px;overflow:hidden;background:linear-gradient(135deg,var(--rose-l),var(--lila-l));display:grid;place-items:center;font-size:12px;text-align:center;color:var(--mute);border:1px dashed var(--line)">${fo[p[0]]?`<img data-media="${fo[p[0]]}" style="width:100%;height:100%;object-fit:cover">`:'＋<br>'+p[1]}</div><input type="file" accept="image/*" id="mp_${p[0]}" data-prev="mph_${p[0]}" hidden><div class="small mute" style="text-align:center;margin-top:3px">${p[1]}</div></label>`).join('')}</div>
+    <p class="small mute">Rellena solo lo que quieras. Para comparar bien: misma hora, misma luz, mismo sitio y ropa ajustada o interior.</p>
+    <div class="actions">${m.id?`<button class="btn danger" data-act="delMeasure" data-id="${m.id}">Borrar</button>`:'<button class="btn soft" data-act="close">Cancelar</button>'}<button class="btn" data-act="saveMeasure" data-id="${m.id||''}">Guardar</button></div>`);hydrate()},
+  saveMeasure:async el=>{if(el.disabled)return;const old=S.measures.find(x=>x.id===el.dataset.id);const m={id:old?old.id:uid(),date:fv('mDate')||ymd(),fotos:{...((old&&old.fotos)||{})}};let any=false;
+    MF.forEach(f=>{const v=fv('m_'+f[0]).replace(',','.');if(v!==''&&!isNaN(v)){m[f[0]]=+v;any=true}});
+    el.disabled=true;el.textContent='Guardando…';
+    for(const p of POSES){const id=await photoFrom('mp_'+p[0]);if(id){if(m.fotos[p[0]])delMedia(m.fotos[p[0]]);m.fotos[p[0]]=id}}
+    if(Object.keys(m.fotos).length)any=true;else delete m.fotos;
+    if(!any){el.disabled=false;el.textContent='Guardar';return toast('Pon al menos una medida o una foto')}
+    if(old){MF.forEach(f=>delete old[f[0]]);Object.assign(old,m)}else S.measures.push(m);
+    save();closeSheet();view='diario';dseg='medidas';render();toast('Medidas guardadas ✓')},
+  delMeasure:el=>{if(!confirm('¿Borrar este registro?'))return;const m=S.measures.find(x=>x.id===el.dataset.id);if(m&&m.fotos)Object.values(m.fotos).forEach(delMedia);S.measures=S.measures.filter(x=>x!==m);save();closeSheet();render()},
   /* Rutinas */
   editRoutine:el=>{const r=S.routines.find(x=>x.id===el.dataset.id)||{icon:'✨',freq:'diaria'};
     sheet(`<h3>${r.id?'Editar rutina':'Nueva rutina'}</h3><div class="grid2" style="grid-template-columns:80px 1fr"><div><label class="f">Icono</label><input id="rIcon" value="${esc(r.icon)}" maxlength="4" style="text-align:center;font-size:22px"></div><div><label class="f">Nombre</label><input id="rName" value="${esc(r.name||'')}" placeholder="Ej: Exfoliante"></div></div>
@@ -999,7 +1013,7 @@ const ACT={
   discreet:()=>{S.settings.discreet=!S.settings.discreet;save();render()},
   key:el=>{const k=el.dataset.k;if(k==='del')pinBuf=pinBuf.slice(0,-1);else if(pinBuf.length<4)pinBuf+=k;drawDots();
     if(pinBuf.length===4){if(hashPin(pinBuf)===S.settings.pin){$('#lock').classList.add('hidden');pinBuf=''}else{const p=$('#dots');p.classList.remove('shake');void p.offsetWidth;p.classList.add('shake');$('#lockMsg').textContent='PIN incorrecto';setTimeout(()=>{pinBuf='';drawDots()},350)}}},
-  export:async()=>{toast('Preparando copia…');const ids=[...S.journal.map(e=>e.photo),...S.wardrobe.map(w=>w.photo),...S.recs.map(r=>r.media)].filter(Boolean);const media={};
+  export:async()=>{toast('Preparando copia…');const ids=[...S.journal.map(e=>e.photo),...S.wardrobe.map(w=>w.photo),...S.recs.map(r=>r.media),...S.measures.flatMap(m=>m.fotos?Object.values(m.fotos):[])].filter(Boolean);const media={};
     for(const id of ids){try{const b=await getMedia(id);if(b)media[id]=await new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.readAsDataURL(b)})}catch(e){}}
     const blob=new Blob([JSON.stringify({app:'lumi',v:1,state:{...S,settings:{...S.settings,aiKey:''}},media})],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`${S.settings.discreet?'notas':'lumi'}-copia-${ymd()}.json`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000)},
   import:()=>$('#importFile').click(),
@@ -1013,7 +1027,7 @@ $('#importFile').addEventListener('change',async e=>{const f=e.target.files[0];e
 
 document.addEventListener('click',e=>{const el=e.target.closest('[data-act]');if(!el)return;const f=ACT[el.dataset.act];if(f){e.preventDefault();f(el,e)}});
 document.addEventListener('keydown',e=>{if(e.target.id==='aiIn'&&e.key==='Enter'&&!e.shiftKey){e.preventDefault();ACT.aiSend()}});
-document.addEventListener('change',e=>{if(e.target.dataset.chg==='name'){S.settings.name=e.target.value.trim();save();toast('Guardado ✓')}});
+document.addEventListener('change',e=>{const pv=e.target.dataset&&e.target.dataset.prev;if(pv&&e.target.files&&e.target.files[0]){const box=document.getElementById(pv);if(box)box.innerHTML=`<img src="${URL.createObjectURL(e.target.files[0])}" style="width:100%;height:100%;object-fit:cover">`}if(e.target.dataset.chg==='name'){S.settings.name=e.target.value.trim();save();toast('Guardado ✓')}});
 
 function stageOpts(act){return STAGES.slice(1).map((s,i)=>`<button class="chk ${S.stage===i+1?'sel':''}" data-act="${act}" data-s="${i+1}"><span class="ic">${s.e}</span><span class="tx"><b>${s.n}</b><small>${s.d}</small></span></button>`).join('')}
 function renderNav(){document.querySelectorAll('.nav button').forEach(b=>{const v=b.dataset.v;b.style.display=SECS.some(s=>s[0]===v)&&!secOn(v)?'none':''})}
