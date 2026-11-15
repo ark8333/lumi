@@ -133,6 +133,7 @@ html.dark #toast{background:#f3e6ee;color:#17101a}
 @keyframes pop{0%{transform:scale(.5)}60%{transform:scale(1.25)}100%{transform:scale(1)}}
 .chk.pop .tick{animation:pop .3s ease}
 .body{display:block;width:100%;max-width:360px;margin:0 auto}
+.ph-miss{display:grid;place-items:center;text-align:center;min-height:90px;padding:10px;border-radius:14px;background:var(--rose-l);color:var(--mute);font-size:12px;width:100%;height:100%}
 .msg{max-width:86%;padding:10px 14px;border-radius:18px;margin:8px 0;white-space:pre-wrap;line-height:1.45}
 .msg.u{margin-left:auto;background:var(--rose);color:#fff;border-bottom-right-radius:6px}
 .msg.a{background:#fff;border:1px solid var(--line);border-bottom-left-radius:6px}
@@ -174,8 +175,8 @@ html.dark #toast{background:#f3e6ee;color:#17101a}
 
 <script>
 'use strict';
-const APP_V='1.19';
-const APP_NEWS='Íntimo con botón propio en el menú y nuevo Modo sesión: tareas una a una, con temporizador y resumen';
+const APP_V='1.20';
+const APP_NEWS='Sincronización cifrada entre móvil y ordenador con tu cuenta anónima de GitHub';
 /* ================= Datos ================= */
 const KEY='lumi_v1';
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
@@ -243,7 +244,8 @@ try{localStorage.setItem('_lt','1');localStorage.removeItem('_lt')}catch(e){stor
 function load(){try{const r=JSON.parse(localStorage.getItem(KEY));if(r)return Object.assign(JSON.parse(JSON.stringify(DEF)),r)}catch(e){}return JSON.parse(JSON.stringify(DEF))}
 let S=load();
 if(S.settings.botUrl===undefined)S.settings.botUrl='';
-function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){toast('⚠️ No se ha podido guardar')}}
+let lastJSON='';
+function save(){try{const j=JSON.stringify({...S,_mod:0});if(j===lastJSON)return;lastJSON=j;S._mod=Date.now();localStorage.setItem(KEY,JSON.stringify(S));if(typeof syncSoon==='function')syncSoon()}catch(e){toast('⚠️ No se ha podido guardar')}}
 
 /* ================= Fotos y audios (IndexedDB) ================= */
 let _db;
@@ -254,7 +256,9 @@ const getMedia=id=>tx('readonly',s=>s.get(id));
 const delMedia=id=>id&&tx('readwrite',s=>s.delete(id)).catch(()=>{});
 const urlCache={};
 async function mediaURL(id){if(!id)return'';if(urlCache[id])return urlCache[id];try{const b=await getMedia(id);if(!b)return'';return urlCache[id]=URL.createObjectURL(b)}catch(e){return''}}
-function hydrate(){document.querySelectorAll('[data-media]').forEach(async el=>{const u=await mediaURL(el.dataset.media);if(u)el.src=u})}
+function hydrate(){document.querySelectorAll('[data-media]').forEach(async el=>{const u=await mediaURL(el.dataset.media);if(u){el.src=u;return}
+  let b=null;try{b=await getMedia(el.dataset.media)}catch(e){}if(b||!el.isConnected)return;
+  const d=document.createElement('div');d.className='ph-miss';d.innerHTML=el.tagName==='AUDIO'?'🎤 Grabación en tu otro dispositivo':'📷<br><span>En tu otro dispositivo</span>';el.replaceWith(d)})}
 function resizeImg(file,max=1200){return new Promise(res=>{const img=new Image(),u=URL.createObjectURL(file);img.onload=()=>{let w=img.width,h=img.height;const k=Math.min(1,max/Math.max(w,h));w=Math.round(w*k);h=Math.round(h*k);const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);URL.revokeObjectURL(u);c.toBlob(b=>res(b||file),'image/jpeg',.85)};img.onerror=()=>res(file);img.src=u})}
 async function photoFrom(inputId){const f=document.getElementById(inputId);if(!f||!f.files||!f.files[0])return null;return putMedia(await resizeImg(f.files[0]))}
 
@@ -850,6 +854,23 @@ function vAjustes(){
   <div class="li"><div class="grow"><b>PIN de bloqueo</b><div class="mute small">${S.settings.pin?'Activado. Se bloquea al salir más de 1 minuto.':'Desactivado'}</div></div>${S.settings.pin?'<button class="btn sm soft" data-act="delPin">Quitar</button>':''}<button class="btn sm" data-act="setPin">${S.settings.pin?'Cambiar':'Poner'}</button></div>
   <div class="li"><div class="grow"><b>Modo discreto</b><div class="mute small">La pestaña se llama "Notas" en vez de "Lumi"</div></div><button class="sw ${S.settings.discreet?'on':''}" data-act="discreet"></button></div>
   <p class="small mute" style="margin:12px 0 0">Todo se guarda solo en este navegador, en este dispositivo. No se envía nada a ningún sitio y funciona sin internet. El PIN es una cortina para miradas curiosas, no un cifrado.</p></div>`;
+  {const c=syncCfg(),on=syncOn();
+  h+=`<div class="card"><h2>🔄 Sincronizar móvil y ordenador</h2>${on?`
+    <div class="li"><div class="grow"><b>${syncing?'Sincronizando…':c.lastSync?'Última vez: '+new Date(c.lastSync).toLocaleString('es-ES',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'Activada'}</b>${syncMsg&&!syncing?`<div class="small" style="color:var(--rose-d)">${esc(syncMsg)}</div>`:''}<div class="small mute">Cifrado con tu contraseña. Se sincroniza sola al abrir y tras cada cambio.</div></div></div>
+    <div class="row" style="margin-top:10px"><button class="btn block" data-act="syncNow">Sincronizar ahora</button><button class="btn soft" data-act="syncOff">Desactivar</button></div>`:`
+    <p class="small mute" style="margin:0 0 6px">Tus datos se guardan <b>cifrados</b> en un archivo secreto de tu cuenta anónima de GitHub. Nadie puede leerlos sin tu contraseña. Las fotos y audios se quedan en cada dispositivo.</p>
+    <details style="margin:6px 0 4px"><summary class="small" style="cursor:pointer;color:var(--rose-d);font-weight:600">Cómo conseguir la llave de GitHub</summary><ol class="small" style="padding-left:18px;margin:8px 0;line-height:1.6">
+    <li>En GitHub, con tu cuenta anónima: foto → <b>Settings</b> → <b>Developer settings</b>.</li>
+    <li><b>Personal access tokens → Fine-grained tokens → Generate new token</b>.</li>
+    <li>Nombre: <i>notas</i>. Caducidad: la más larga (1 año).</li>
+    <li>Repository access: <b>Public repositories</b>.</li>
+    <li>En <b>Account permissions</b>, busca <b>Gists</b> y ponlo en <b>Read and write</b>.</li>
+    <li><b>Generate token</b> y cópiala (empieza por <i>github_pat_</i>).</li></ol></details>
+    <label class="f">Llave de GitHub</label><input id="syTok" type="password" autocomplete="off" placeholder="github_pat_…">
+    <label class="f">Contraseña de cifrado</label><input id="syPass" type="password" autocomplete="new-password" placeholder="Inventa una y úsala igual en los dos">
+    <label class="f">Repite la contraseña</label><input id="syPass2" type="password" autocomplete="new-password">
+    <p class="small mute">Pon la <b>misma llave y la misma contraseña</b> en el móvil y en el ordenador. Si olvidas la contraseña no se puede recuperar lo sincronizado (tus datos locales siguen ahí).</p>
+    <button class="btn block" data-act="syncSetup">Activar sincronización</button>`}</div>`}
   h+=`<div class="card"><h2>Copias de seguridad</h2><p class="small mute" style="margin:0 0 12px">Si borras los datos del navegador (o tienes activado en Brave "borrar datos al salir"), se pierde todo. Haz una copia de vez en cuando y guárdala donde quieras.</p>
   <div class="row"><button class="btn block" data-act="export">⬇ Exportar copia</button><button class="btn ghost block" data-act="import">⬆ Importar</button></div></div>`;
   h+=`<div class="card"><h2>Zona peligrosa</h2><button class="btn danger block" data-act="wipe">Borrar todos los datos</button></div>`;
@@ -1007,6 +1028,13 @@ const ACT={
   setModel:el=>{S.settings.aiModel=el.dataset.m;S.aiTip=S.aiTip;save();closeSheet();render();toast(el.dataset.m?'Modelo: '+el.dataset.m:'Modelo automático ✨')},
   savePersona:()=>{S.settings.persona=fv('aiPersona');save();render();toast('Personalidad guardada ✓')},
   resetPersona:()=>{S.settings.persona='';save();render();toast('Valeria original ✓')},
+  syncSetup:async el=>{const t=fv('syTok'),p=fv('syPass'),p2=fv('syPass2');if(!t)return toast('Pega la llave de GitHub');if(p.length<6)return toast('La contraseña debe tener al menos 6 caracteres');if(p!==p2)return toast('Las contraseñas no coinciden');
+    if(!(window.crypto&&crypto.subtle))return toast('Abre la app desde su dirección https para poder cifrar');
+    el.disabled=true;el.textContent='Comprobando…';
+    try{await gh('GET','/gists?per_page=1',null,t);setSyncCfg({token:t,pass:p});syncMsg='';toast('Llave correcta ✓');await syncNow(true)}
+    catch(e){toast('⚠️ '+e.message);el.disabled=false;el.textContent='Activar sincronización'}render()},
+  syncNow:()=>syncNow(true),
+  syncOff:()=>{if(!confirm('¿Desactivar la sincronización en este dispositivo? Tus datos de aquí no se borran.'))return;localStorage.removeItem(SYNC_KEY);syncMsg='';render()},
   setTheme:el=>{S.settings.theme=el.dataset.t;save();render()},
   sugName:el=>{const box=document.getElementById(el.dataset.box);const pick=[...NAMES].sort(()=>Math.random()-.5).slice(0,8);
     box.innerHTML=pick.map(n=>`<button class="chip" data-act="useName" data-n="${n}" data-in="${el.dataset.in}">${n}</button>`).join('');el.textContent='🎲 Otros nombres'},
@@ -1207,7 +1235,7 @@ const ACT={
     const blob=new Blob([JSON.stringify({app:'lumi',v:1,state:{...S,settings:{...S.settings,aiKey:''}},media})],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`${S.settings.discreet?'notas':'lumi'}-copia-${ymd()}.json`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000)},
   import:()=>$('#importFile').click(),
   wipe:async()=>{if(!confirm('Se borrará TODO: diario, fotos, grabaciones, tareas… ¿Seguro?'))return;if(!confirm('Última confirmación. No se puede deshacer.'))return;
-    try{localStorage.removeItem(KEY)}catch(e){}try{indexedDB.deleteDatabase('lumi_media')}catch(e){}location.reload()}
+    try{localStorage.removeItem(KEY);localStorage.removeItem('lumi_sync')}catch(e){}try{indexedDB.deleteDatabase('lumi_media')}catch(e){}location.reload()}
 };
 $('#importFile').addEventListener('change',async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;
   try{const d=JSON.parse(await f.text());if(d.app!=='lumi'||!d.state)throw 0;if(!confirm('Esto sustituirá los datos actuales por los de la copia. ¿Continuar?'))return;
@@ -1233,6 +1261,67 @@ const isInstalled=()=>matchMedia('(display-mode: standalone)').matches||navigato
 if('serviceWorker' in navigator&&/^https?:/.test(location.protocol))window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installEv=e;if(view==='ajustes'||view==='hoy')render()});
 window.addEventListener('appinstalled',()=>{installEv=null;toast('¡App instalada! 🎉');render()});
+
+/* ================= Sincronización cifrada (GitHub Gist) ================= */
+const SYNC_KEY='lumi_sync',GIST_DESC='notas-sync',GIST_FILE='notas.enc';
+const syncCfg=()=>{try{return JSON.parse(localStorage.getItem(SYNC_KEY)||'{}')}catch(e){return {}}};
+const setSyncCfg=c=>{try{localStorage.setItem(SYNC_KEY,JSON.stringify(c))}catch(e){}};
+const syncOn=()=>{const c=syncCfg();return !!(c.token&&c.pass)};
+function u8b64(u){let s='';for(let i=0;i<u.length;i+=0x8000)s+=String.fromCharCode.apply(null,u.subarray(i,i+0x8000));return btoa(s)}
+function b64u8(b){const s=atob(b),u=new Uint8Array(s.length);for(let i=0;i<s.length;i++)u[i]=s.charCodeAt(i);return u}
+async function kdf(pass,salt){const km=await crypto.subtle.importKey('raw',new TextEncoder().encode(pass),'PBKDF2',false,['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:200000,hash:'SHA-256'},km,{name:'AES-GCM',length:256},false,['encrypt','decrypt'])}
+async function encObj(obj,pass){const salt=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12));const k=await kdf(pass,salt);
+  const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv},k,new TextEncoder().encode(JSON.stringify(obj)));return JSON.stringify({v:1,salt:u8b64(salt),iv:u8b64(iv),ct:u8b64(new Uint8Array(ct))})}
+async function decObj(txt,pass){const p=JSON.parse(txt);const k=await kdf(pass,b64u8(p.salt));
+  try{const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:b64u8(p.iv)},k,b64u8(p.ct));return JSON.parse(new TextDecoder().decode(pt))}catch(e){throw new Error('La contraseña de sincronización no coincide con la del otro dispositivo')}}
+async function gh(method,path,body,token){const r=await fetch('https://api.github.com'+path,{method,cache:'no-store',
+    headers:{'Authorization':'Bearer '+(token||syncCfg().token),'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28',...(body?{'Content-Type':'application/json'}:{})},body:body?JSON.stringify(body):undefined});
+  if(r.status===401)throw new Error('La llave de GitHub no es válida o ha caducado');
+  if(r.status===403||r.status===404)throw new Error('La llave no tiene permiso de Gists (lectura y escritura)');
+  if(!r.ok)throw new Error('GitHub: error '+r.status);return r.status===204?null:r.json()}
+const LOCAL_SETTINGS=['theme','noInstall','discreet','intNav'];
+function keepLocal(remote){const o={...remote,settings:{...(remote.settings||{})}};LOCAL_SETTINGS.forEach(k=>{if(S.settings[k]!==undefined)o.settings[k]=S.settings[k]});return o}
+function mergeArr(a,b,newerA){a=a||[];b=b||[];if(!a.length)return b;if(!b.length)return a;
+  if(typeof a[0]==='string'||typeof b[0]==='string')return [...new Set([...a,...b])];
+  if(a.concat(b).every(x=>x&&typeof x==='object'&&'id' in x)){const m=new Map();(newerA?[...b,...a]:[...a,...b]).forEach(x=>m.set(x.id,x));const ord=[...a,...b].map(x=>x.id);return [...new Set(ord)].map(id=>m.get(id))}
+  const seen=new Set(),out=[];for(const x of [...a,...b]){const k=JSON.stringify(x);if(!seen.has(k)){seen.add(k);out.push(x)}}return out}
+function mergeState(L,R){const newerL=(L._mod||0)>=(R._mod||0);const out={...(newerL?R:L),...(newerL?L:R)};
+  for(const k of new Set([...Object.keys(L),...Object.keys(R)])){const a=L[k],b=R[k];
+    if(Array.isArray(a)||Array.isArray(b))out[k]=mergeArr(a,b,newerL);
+    else if(k!=='settings'&&a&&b&&typeof a==='object'&&typeof b==='object'&&Object.values({...a,...b}).every(v=>Array.isArray(v))){const o={};for(const d of new Set([...Object.keys(a),...Object.keys(b)]))o[d]=[...new Set([...(a[d]||[]),...(b[d]||[])])];out[k]=o}}
+  out.settings={...(newerL?R.settings:L.settings),...(newerL?L.settings:R.settings)};LOCAL_SETTINGS.forEach(k=>{if(L.settings[k]!==undefined)out.settings[k]=L.settings[k]});
+  return out}
+let syncing=false,syncTimer=null,syncMsg='';
+function syncSoon(){if(!syncOn())return;clearTimeout(syncTimer);syncTimer=setTimeout(()=>syncNow(),6000)}
+async function syncNow(manual){
+  if(!syncOn()||syncing||!navigator.onLine)return;if(!(window.crypto&&crypto.subtle)){syncMsg='Este navegador no permite cifrar aquí: abre la app desde su dirección https.';return}
+  syncing=true;syncMsg='Sincronizando…';if(view==='ajustes')render();const c=syncCfg();let changed=false;
+  try{
+    if(!c.gist){const l=await gh('GET','/gists?per_page=100');const g=(l||[]).find(x=>x.description===GIST_DESC&&x.files&&x.files[GIST_FILE]);if(g)c.gist=g.id}
+    let remote=null;
+    if(c.gist){let g;try{g=await gh('GET','/gists/'+c.gist)}catch(e){if(/permiso/.test(e.message)){c.gist=null}else throw e}
+      if(g&&g.files&&g.files[GIST_FILE]){const f=g.files[GIST_FILE];const txt=f.truncated?await (await fetch(f.raw_url,{cache:'no-store'})).text():f.content;remote=await decObj(txt,c.pass)}}
+    const localDirty=(S._mod||0)>(c.lastLocal||0),remoteNew=remote&&(remote._mod||0)>(c.lastRemote||0);
+    if(remote&&remoteNew){
+      let useRemote=!localDirty;
+      if(localDirty&&!c.lastRemote)useRemote=confirm('Ya hay datos sincronizados de tu otro dispositivo.\n\nAceptar = usar esos datos (recomendado si este dispositivo es nuevo).\nCancelar = juntarlos con los de aquí.');
+      const next=useRemote?keepLocal(remote):mergeState(S,remote);
+      S=Object.assign(JSON.parse(JSON.stringify(DEF)),next);if(!useRemote)S._mod=Date.now();changed=true;
+      lastJSON=JSON.stringify({...S,_mod:0});localStorage.setItem(KEY,JSON.stringify(S));
+      if(S.stage&&$('#obName'))closeSheet()}
+    if(!remote||(S._mod||0)>(remote._mod||0)){const content=await encObj(S,c.pass);
+      if(c.gist)await gh('PATCH','/gists/'+c.gist,{files:{[GIST_FILE]:{content}}});
+      else{const g=await gh('POST','/gists',{description:GIST_DESC,public:false,files:{[GIST_FILE]:{content}}});c.gist=g.id}
+      c.lastRemote=S._mod}
+    else c.lastRemote=remote._mod;
+    c.lastLocal=S._mod;c.lastSync=Date.now();setSyncCfg(c);syncMsg='';
+    if(changed){render();toast('🔄 Datos sincronizados')}else if(manual)toast('Sincronizado ✓');
+  }catch(e){syncMsg='⚠️ '+(e.message||'No se pudo sincronizar');setSyncCfg(c);if(manual)toast(syncMsg)}
+  syncing=false;if(view==='ajustes')render()}
+setTimeout(()=>syncNow(),2500);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(()=>syncNow(),800)});
+window.addEventListener('online',()=>syncNow());
 
 /* ================= Auto-actualización ================= */
 let updChecking=false;
