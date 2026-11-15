@@ -173,8 +173,8 @@ html.dark #toast{background:#f3e6ee;color:#17101a}
 
 <script>
 'use strict';
-const APP_V='1.14';
-const APP_NEWS='Más visual: accesos rápidos en Hoy, tu cuerpo dibujado con tus medidas, iconos por sección y menú más claro';
+const APP_V='1.15';
+const APP_NEWS='Íntimo renovado (categorías, temporizador, reto íntimo del día, calendario), Valeria más abierta y con personalidad editable';
 /* ================= Datos ================= */
 const KEY='lumi_v1';
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
@@ -474,6 +474,8 @@ async function autoReto(){const rp=S.retoPick;if(!hasAI()||retoAuto||!rp||rp.ai|
     const txt=(t.split('\n').map(x=>x.trim()).filter(Boolean)[0]||'').replace(/^["“'*\-\s]+|["”'*\s]+$/g,'');
     if(txt&&S.retoPick===rp&&!rp.done){S.retoPick={...rp,text:txt,ai:true};save();if(view==='hoy')render();getGuide('reto',txt).catch(()=>{})}}catch(e){}
   retoAuto=false}
+const SEX_LINE='Si ella saca el tema, hablas de sexualidad e intimidad con naturalidad y sin tabúes, relacionándolo con su feminización y respetando siempre sus límites.';
+const SAFE_LINE='Sobre hormonas o tratamientos médicos nunca das dosis ni animas a automedicarse: remites siempre a su endocrino o a la unidad de identidad de género.';
 const AI_SYS='Eres Valeria, asistente experta en feminización, imagen y cuidado personal: tallas, ropa y estilo según el cuerpo, maquillaje, cuidado de piel, depilación, voz, postura, pelo y pelucas. Hablas en español de España, cercana, clara y práctica, con explicaciones paso a paso y productos concretos con alternativas baratas. Nunca juzgas. Usas siempre el femenino con la usuaria. Adaptas los consejos a su etapa y nunca la empujas a algo de una etapa a la que no ha llegado. Sobre hormonas o tratamientos médicos das solo información general y nunca dosis: remites siempre a un endocrino o a la unidad de identidad de género. Respuestas breves salvo que pida detalle.';
 async function loadTip(){
   if(!hasAI()||tipLoading||(S.aiTip&&S.aiTip.date===ymd()))return;tipLoading=true;
@@ -543,7 +545,7 @@ function retoHoy(){const t=ymd(),pool=retoPool();if(!pool.length)return null;
   return S.retoPick}
 
 /* ================= Vistas ================= */
-let view='hoy',dseg='entradas',metric='cintura',wf='todo',ilvl=0,drawn=null;
+let view='hoy',dseg='entradas',metric='cintura',wf='todo',ilvl=0,drawn=null,icat='',intShown=false;
 const VIEWS={hoy:vHoy,diario:vDiario,rutinas:vRutinas,voz:vVoz,mas:vMas,armario:vArmario,salud:vSalud,intimo:vIntimo,retos:vRetos,chat:vChat,ia:vIA,entreno:vEntreno,progreso:vProgreso,ajustes:vAjustes};
 const MAS=['armario','salud','intimo','retos','ajustes','chat','ia','entreno','progreso'];
 function go(v){if(v!==view)stopMic();view=v;drawn=null;render();window.scrollTo(0,0)}
@@ -591,6 +593,9 @@ function vHoy(){
     else if(dow===0&&weeklyLoading)h+=`<div class="card"><h2>📊 Tu semana</h2><div class="mute">Valeria está escribiendo tu resumen…</div></div>`}
   const rp=retoHoy();
   if(rp){h+=`<div class="card reto"><h2>Reto del día ${rp.done?'· ✓ conseguido':''}${rp.ai?' · ✨ IA':''}</h2><p>${esc(rp.text)}</p><div class="row wrap">${rp.done?`<button class="btn" data-act="retoOtro">Otro reto</button>`:`<button class="btn w" data-act="retoDone">¡Hecho!</button><button class="btn" data-act="retoOtro">Cambiar</button>`}${hasAI()?`<button class="btn" data-act="retoAI">✨ Inventa uno</button>`:''}</div>${hasAI()?`<button class="btn w block" style="margin-top:10px" data-act="retoHow">📖 Cómo hacerlo</button>`:''}</div>`}
+  if(secOn('intimo')&&S.settings.intDaily&&S.intimate.length){const ip=intHoy();
+    h+=`<div class="card" style="padding:14px 18px"><div class="row between"><b>🔒 Reto íntimo del día${ip.done?' · ✓':''}</b><button class="btn sm soft" data-act="intReveal">${intShown?'Ocultar':'Ver'}</button></div>
+    ${intShown?`<div class="drawn" style="margin:12px 0 10px">${esc(ip.item.text)}<div style="font-size:14px;margin-top:8px">${FL[ip.item.lvl]||''}</div>${ip.item.mins?`<button class="btn sm" style="margin-top:12px;background:rgba(255,255,255,.18)" data-act="gTimer" data-s="${ip.item.mins*60}">▶ ${mmss(ip.item.mins*60)}</button>`:''}</div>${ip.done?'':'<div class="row"><button class="btn block" data-act="intPickDone">✓ Hecha</button><button class="btn ghost block" data-act="intPickOther">Otra</button></div>'}`:''}</div>`}
   if(secOn('entreno')){const P=plan(),d=(S.planDone||0)%P.days.length,D=P.days[d],hecho=S.planDoneDate===t;
     h+=`<button class="tile" style="width:100%;margin-bottom:14px;display:flex;align-items:center;gap:14px" data-act="goEnt" data-d="${d}"><span style="font-size:28px">${hecho?'✅':'🏋️'}</span><span style="flex:1"><span class="small mute" style="display:block">${hecho?'Entreno de hoy hecho':'Entreno de hoy'}</span><b style="font-size:18px;margin:0">Día ${d+1}: ${esc(D.name)}</b><span>${D.ex.length} ejercicios</span></span><span style="font-size:22px" class="mute">›</span></button>`}
   const pend=S.routines.filter(r=>!isDone(r)),hechas=S.routines.filter(isDone);
@@ -711,17 +716,29 @@ function vSalud(){
 }
 
 const FL=['','🔥','🔥🔥','🔥🔥🔥'];
+function intHoy(){if(!S.intimate.length)return null;const t=ymd();
+  if(!S.intPick||S.intPick.date!==t||!S.intimate.some(x=>x.id===S.intPick.id)){const it=S.intimate[Math.floor(Math.random()*S.intimate.length)];S.intPick={date:t,id:it.id,done:false};save()}
+  return {...S.intPick,item:S.intimate.find(x=>x.id===S.intPick.id)}}
 function vIntimo(){
   let h=head('Íntimo','Solo para ti','mas');
   if(!S.settings.pin)h+=`<div class="warn">🔒 Te recomiendo poner un PIN en <b>Ajustes</b> para que nadie vea esta sección si coge tu móvil.</div>`;
-  const pool=S.intimate.filter(i=>!ilvl||i.lvl===ilvl);
-  h+=`<div class="card"><h2>Sacar una tarea</h2><div class="chips">${[0,1,2,3].map(l=>`<button class="chip ${ilvl===l?'on':''}" data-act="ilvl" data-l="${l}">${l?FL[l]:'Todas'}</button>`).join('')}</div>
-  ${drawn?`<div class="drawn">${esc(drawn.text)}<div style="font-size:14px;margin-top:8px">${FL[drawn.lvl]||''}</div></div><div class="row"><button class="btn block" data-act="intDone">✓ Hecha</button><button class="btn ghost block" data-act="drawInt">Otra</button></div>`:`<button class="btn block" data-act="drawInt" ${pool.length?'':'disabled style="opacity:.5"'}>🎲 Sacar al azar (${pool.length})</button>`}</div>`;
-  h+=`<div class="card"><h2>Mis tareas <button class="btn sm" data-act="editInt">＋</button></h2><p class="small mute" style="margin:0 0 10px">Escribe aquí tus propias tareas y retos. Se guardan solo en este dispositivo.</p>${S.intimate.map(i=>`<div class="li"><div class="grow">${esc(i.text)}<div class="small">${FL[i.lvl]||''}</div></div><button class="x" data-act="editInt" data-id="${i.id}">✎</button><button class="x" data-act="delInt" data-id="${i.id}">✕</button></div>`).join('')||'<div class="empty">Todavía no has escrito ninguna.</div>'}</div>`;
-  if(S.intimateLog.length)h+=`<div class="card"><h2>Hechas <button class="btn sm soft" data-act="clearIntLog">Borrar historial</button></h2>${S.intimateLog.slice(-15).reverse().map(l=>`<div class="li"><div class="grow small">${esc(l.text)}</div><span class="mute small">${fmt(l.date)}</span></div>`).join('')}</div>`;
+  if(S.settings.botUrl)h+=`<a class="btn ghost block" style="text-align:center;text-decoration:none;margin-bottom:14px" href="${esc(S.settings.botUrl)}" target="_blank" rel="noopener noreferrer">💬 Hablar con Valeria en Crushon ↗</a>`;
+  const cats=S.intCats||[];if(icat&&!cats.includes(icat))icat='';
+  const pool=S.intimate.filter(i=>(!ilvl||i.lvl===ilvl)&&(!icat||i.cat===icat));
+  h+=`<div class="card"><h2>🎲 Sacar una tarea</h2>
+  ${cats.length?`<div class="chips" style="margin-bottom:8px"><button class="chip ${!icat?'on':''}" data-act="icat" data-c="">Todas</button>${cats.map(c=>`<button class="chip ${icat===c?'on':''}" data-act="icat" data-c="${esc(c)}">${esc(c)}</button>`).join('')}</div>`:''}
+  <div class="chips">${[0,1,2,3].map(l=>`<button class="chip ${ilvl===l?'on':''}" data-act="ilvl" data-l="${l}">${l?FL[l]:'Cualquier nivel'}</button>`).join('')}</div>
+  ${drawn?`<div class="drawn">${esc(drawn.text)}<div style="font-size:14px;margin-top:8px">${FL[drawn.lvl]||''}${drawn.cat?' · '+esc(drawn.cat):''}</div>${drawn.mins?`<button class="btn sm" style="margin-top:12px;background:rgba(255,255,255,.18)" data-act="gTimer" data-s="${drawn.mins*60}">▶ ${mmss(drawn.mins*60)}</button>`:''}</div><div class="row"><button class="btn block" data-act="intDone">✓ Hecha</button><button class="btn ghost block" data-act="drawInt">Otra</button></div>`:`<button class="btn block" data-act="drawInt" ${pool.length?'':'disabled style="opacity:.5"'}>🎲 Sacar al azar (${pool.length})</button>`}</div>`;
+  h+=`<div class="card"><div class="li"><div class="grow"><b>Reto íntimo del día</b><div class="mute small">Te sale cada día en Hoy, tapado. Solo se ve si lo tocas.</div></div><button class="sw ${S.settings.intDaily?'on':''}" data-act="intDaily"></button></div></div>`;
+  h+=`<div class="card"><h2>Mis tareas <span class="row" style="gap:6px"><button class="btn sm soft" data-act="intCats">Categorías</button><button class="btn sm" data-act="editInt">＋</button></span></h2><p class="small mute" style="margin:0 0 10px">Tú escribes tus tareas. Se guardan solo en este dispositivo.</p>
+  ${S.intimate.map(i=>`<div class="li"><div class="grow">${esc(i.text)}<div class="small">${FL[i.lvl]||''}${i.cat?` <span class="tag l" style="margin:0 0 0 4px">${esc(i.cat)}</span>`:''}${i.mins?` <span class="mute">· ⏱ ${i.mins} min</span>`:''}</div></div><button class="x" data-act="editInt" data-id="${i.id}">✎</button><button class="x" data-act="delInt" data-id="${i.id}">✕</button></div>`).join('')||'<div class="empty">Todavía no has escrito ninguna.</div>'}</div>`;
+  if(S.intimateLog.length){const days=daysBack(28),cnt={};S.intimateLog.forEach(l=>cnt[l.date]=(cnt[l.date]||0)+1);
+    h+=`<div class="card"><h2>📅 Últimas 4 semanas <button class="btn sm soft" data-act="clearIntLog">Borrar</button></h2>
+    <div class="week" style="gap:5px">${days.map(d=>`<div><i style="width:100%;height:30px;border-radius:9px;margin:0;${cnt[d]?`background:rgba(196,87,126,${Math.min(1,.35+cnt[d]*.25)})`:''}" title="${d}"></i></div>`).join('')}</div>
+    <div class="small mute" style="margin:8px 0 6px">${S.intimateLog.length} hechas en total · ${days.filter(d=>cnt[d]).length} días este mes</div>
+    ${S.intimateLog.slice(-8).reverse().map(l=>`<div class="li"><div class="grow small">${esc(l.text)}</div><span class="mute small">${fmt(l.date)}</span></div>`).join('')}</div>`}
   return h;
 }
-
 function vChat(){
   const u=S.settings.botUrl;if(!u)return head('Chatbot','Tu asistente','mas')+'<div class="card empty">Configura tu chatbot en Ajustes.</div>';
   return head('Chatbot','Tu asistente','mas')+`<a class="btn ghost block" style="text-align:center;text-decoration:none;margin-bottom:12px" href="${esc(u)}" target="_blank" rel="noopener noreferrer">↗ Abrir en otra pestaña</a>
@@ -760,6 +777,9 @@ function vAjustes(){
   h+=`<div class="card"><h2>Secciones</h2><p class="small mute" style="margin:0 0 6px">Enciende solo lo que te sirva ahora. Puedes activar el resto cuando quieras; no se borra nada.</p>${SECS.map(s=>`<div class="li"><span style="font-size:20px">${s[1]}</span><div class="grow">${s[2]}</div><button class="sw ${secOn(s[0])?'on':''}" data-act="togSec" data-k="${s[0]}"></button></div>`).join('')}</div>`;
   h+=`<div class="card"><h2>Inteligencia artificial</h2><p class="small mute" style="margin:0 0 6px">Con una clave de <b>OpenRouter</b> (gratis, con límite de unas 50 peticiones al día) Lumi te escribe un mensaje distinto cada día, inventa retos nuevos y tienes a Valeria para preguntarle dentro de la app.</p>
   <label class="f">Clave de API</label><input id="aiKey" type="password" autocomplete="off" placeholder="sk-or-…" value="${esc(S.settings.aiKey||'')}">
+  <label class="f">Personalidad de Valeria (chat)</label><textarea id="aiPersona" style="min-height:120px" placeholder="${esc(AI_SYS)}">${esc(S.settings.persona||'')}</textarea>
+  <div class="row" style="margin-top:8px"><button class="btn sm" data-act="savePersona">Guardar personalidad</button>${S.settings.persona?'<button class="btn sm soft" data-act="resetPersona">Volver a la original</button>':''}</div>
+  <p class="small mute">Vacío = la personalidad original (la que ves en gris). Escribe con tus palabras cómo quieres que sea, cómo te hable y de qué. Siempre puede hablar de sexualidad si tú sacas el tema, y nunca da dosis de medicación.</p>
   <label class="f">Modelo</label><div class="row"><input id="aiModel" placeholder="Automático (openrouter/free)" value="${esc(S.settings.aiModel||'')}"><button class="btn sm ghost" style="flex:none" data-act="pickModel">📋 Elegir de la lista</button></div>
   <p class="small mute">Déjalo vacío para usar los modelos gratuitos. Lo que mandes a la IA sale del móvil hacia OpenRouter; el resto de Lumi sigue siendo local. La clave se guarda solo aquí y no va en las copias de seguridad.</p>
   <div class="row"><button class="btn block" data-act="saveAI">Guardar y probar</button>${S.settings.aiKey?'<button class="btn soft" data-act="delAI">Quitar</button>':''}</div></div>`;
@@ -825,7 +845,7 @@ async function toggleRec(){
 /* ================= Bloqueo PIN ================= */
 function hashPin(p){let h=5381;for(const ch of 'lumi:'+p)h=(((h<<5)+h)+ch.charCodeAt(0))>>>0;let h2=52711;for(const ch of p+':imul')h2=(Math.imul(h2^ch.charCodeAt(0),2654435761))>>>0;return h.toString(36)+h2.toString(36)}
 let pinBuf='';
-function showLock(){pinBuf='';drawDots();$('#lock').classList.remove('hidden');closeSheet();stopMic()}
+function showLock(){pinBuf='';intShown=false;drawn=null;drawDots();$('#lock').classList.remove('hidden');closeSheet();stopMic()}
 function drawDots(){document.querySelectorAll('#dots i').forEach((d,i)=>d.classList.toggle('on',i<pinBuf.length))}
 let hiddenAt=0;
 document.addEventListener('visibilitychange',()=>{if(document.hidden){hiddenAt=Date.now();stopMic()}else if(S.settings.pin&&hiddenAt&&Date.now()-hiddenAt>60000)showLock()});
@@ -856,7 +876,7 @@ const ACT={
       S.retoPick={date:ymd(),text:txt.replace(/^["“'*\-\s]+|["”'*\s]+$/g,''),done:false,stage:S.stage,ai:true};save();render();getGuide('reto',S.retoPick.text).catch(()=>{})}
     catch(e){toast(e.message||'No se pudo conectar');render()}},
   aiSend:async(el,ev,preset)=>{const q=preset||fv('aiIn');if(!q||aiBusy)return;S.aiChat=S.aiChat||[];S.aiChat.push({role:'user',content:q});aiBusy=true;save();render();
-    try{const raw=await aiStream([{role:'system',content:AI_SYS+'\n\n'+ACT_SYS+'\n\n'+aiCtx()},...S.aiChat.slice(-20).map(m=>({role:m.role,content:m.content}))],full=>{
+    try{const raw=await aiStream([{role:'system',content:((S.settings.persona||'').trim()||AI_SYS)+'\n'+SEX_LINE+'\n'+SAFE_LINE+'\n\n'+ACT_SYS+'\n\n'+aiCtx()},...S.aiChat.slice(-20).map(m=>({role:m.role,content:m.content}))],full=>{
         const el=$('#streamMsg');if(!el)return;const v=full.replace(/<acciones>[\s\S]*$/i,'').replace(/<think>[\s\S]*?(<\/think>|$)/g,'').trim();
         if(v){el.textContent=v;el.classList.remove('t');window.scrollTo(0,document.body.scrollHeight)}},1500,.7);
       const {text,acts}=splitActs(raw||'');const done=runActs(acts);
@@ -923,6 +943,8 @@ const ACT={
         <div class="actions"><button class="btn soft" data-act="close">Cerrar</button></div>`)}
     catch(e){toast('No se pudo cargar la lista');el.textContent='📋 Elegir de la lista';el.disabled=false}},
   setModel:el=>{S.settings.aiModel=el.dataset.m;S.aiTip=S.aiTip;save();closeSheet();render();toast(el.dataset.m?'Modelo: '+el.dataset.m:'Modelo automático ✨')},
+  savePersona:()=>{S.settings.persona=fv('aiPersona');save();render();toast('Personalidad guardada ✓')},
+  resetPersona:()=>{S.settings.persona='';save();render();toast('Valeria original ✓')},
   setTheme:el=>{S.settings.theme=el.dataset.t;save();render()},
   sugName:el=>{const box=document.getElementById(el.dataset.box);const pick=[...NAMES].sort(()=>Math.random()-.5).slice(0,8);
     box.innerHTML=pick.map(n=>`<button class="chip" data-act="useName" data-n="${n}" data-in="${el.dataset.in}">${n}</button>`).join('');el.textContent='🎲 Otros nombres'},
@@ -1023,15 +1045,27 @@ const ACT={
   delLab:el=>{S.labs=S.labs.filter(x=>x.id!==el.dataset.id);save();render()},
   /* Íntimo */
   ilvl:el=>{ilvl=+el.dataset.l;drawn=null;render()},
-  drawInt:()=>{const pool=S.intimate.filter(i=>(!ilvl||i.lvl===ilvl)&&(!drawn||i.id!==drawn.id||S.intimate.length===1));if(!pool.length)return toast('No hay tareas en este nivel');drawn=pool[Math.floor(Math.random()*pool.length)];render()},
+  icat:el=>{icat=el.dataset.c;drawn=null;render()},
+  drawInt:()=>{const pool=S.intimate.filter(i=>(!ilvl||i.lvl===ilvl)&&(!icat||i.cat===icat)&&(!drawn||i.id!==drawn.id||S.intimate.length===1));if(!pool.length)return toast('No hay tareas con ese filtro');drawn=pool[Math.floor(Math.random()*pool.length)];render()},
   intDone:()=>{if(!drawn)return;S.intimateLog.push({date:ymd(),text:drawn.text});drawn=null;save();toast('Hecha ✓');render()},
-  editInt:el=>{const i=S.intimate.find(x=>x.id===el.dataset.id)||{lvl:1};
+  editInt:el=>{const i=S.intimate.find(x=>x.id===el.dataset.id)||{lvl:1,cat:icat||''};const cats=S.intCats||[];
     sheet(`<h3>${i.id?'Editar tarea':'Nueva tarea'}</h3><label class="f">Tarea</label><textarea id="iText" placeholder="Escribe tu tarea…">${esc(i.text||'')}</textarea>
-    <label class="f">Intensidad</label><select id="iLvl">${[1,2,3].map(l=>`<option value="${l}" ${i.lvl===l?'selected':''}>${FL[l]}</option>`).join('')}</select>
+    <div class="grid2"><div><label class="f">Intensidad</label><select id="iLvl">${[1,2,3].map(l=>`<option value="${l}" ${i.lvl===l?'selected':''}>${FL[l]}</option>`).join('')}</select></div>
+    <div><label class="f">Minutos (opcional)</label><input type="number" id="iMins" inputmode="numeric" min="0" value="${i.mins||''}" placeholder="Sin tiempo"></div></div>
+    <label class="f">Categoría</label><select id="iCat"><option value="">Sin categoría</option>${cats.map(c=>`<option ${i.cat===c?'selected':''}>${esc(c)}</option>`).join('')}</select>
+    ${cats.length?'':'<p class="small mute">Puedes crear categorías con el botón "Categorías".</p>'}
     <div class="actions"><button class="btn soft" data-act="close">Cancelar</button><button class="btn" data-act="saveInt" data-id="${i.id||''}">Guardar</button></div>`)},
-  saveInt:el=>{const text=fv('iText');if(!text)return toast('Escribe la tarea');const d={text,lvl:+fv('iLvl')||1};const i=S.intimate.find(x=>x.id===el.dataset.id);
+  saveInt:el=>{const text=fv('iText');if(!text)return toast('Escribe la tarea');const d={text,lvl:+fv('iLvl')||1,cat:fv('iCat'),mins:Math.max(0,parseInt(fv('iMins'))||0)};const i=S.intimate.find(x=>x.id===el.dataset.id);
     if(i)Object.assign(i,d);else S.intimate.push({id:uid(),...d});save();closeSheet();render()},
   delInt:el=>{if(!confirm('¿Borrar esta tarea?'))return;S.intimate=S.intimate.filter(x=>x.id!==el.dataset.id);if(drawn&&drawn.id===el.dataset.id)drawn=null;save();render()},
+  intCats:()=>{const c=S.intCats||[];sheet(`<h3>Categorías</h3><div class="card">${c.map((x,k)=>`<div class="li"><div class="grow">${esc(x)}</div><button class="x" data-act="intCatDel" data-i="${k}">✕</button></div>`).join('')||'<div class="empty">Sin categorías</div>'}</div>
+    <label class="f">Nueva categoría</label><div class="row"><input id="iCatIn" placeholder="El nombre que quieras"><button class="btn" data-act="intCatAdd">＋</button></div><div class="actions"><button class="btn soft" data-act="close">Cerrar</button></div>`)},
+  intCatAdd:()=>{const v=fv('iCatIn');if(!v)return;S.intCats=S.intCats||[];if(!S.intCats.includes(v))S.intCats.push(v);save();ACT.intCats();render()},
+  intCatDel:el=>{const v=S.intCats[+el.dataset.i];S.intCats.splice(+el.dataset.i,1);S.intimate.forEach(x=>{if(x.cat===v)x.cat=''});save();ACT.intCats();render()},
+  intDaily:()=>{S.settings.intDaily=!S.settings.intDaily;save();render()},
+  intReveal:()=>{intShown=!intShown;render()},
+  intPickDone:()=>{const ip=intHoy();if(!ip||ip.done)return;S.intPick.done=true;S.intimateLog.push({date:ymd(),text:ip.item.text});intShown=false;save();toast('Hecha ✓');render()},
+  intPickOther:()=>{if(S.intimate.length<2)return;let it;do{it=S.intimate[Math.floor(Math.random()*S.intimate.length)]}while(it.id===S.intPick.id);S.intPick={date:ymd(),id:it.id,done:false};save();render()},
   clearIntLog:()=>{if(!confirm('¿Borrar el historial?'))return;S.intimateLog=[];save();render()},
   /* Retos */
   editReto:el=>{const i=el.dataset.i!==undefined?+el.dataset.i:-1;
