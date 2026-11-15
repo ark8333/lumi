@@ -173,8 +173,8 @@ html.dark #toast{background:#f3e6ee;color:#17101a}
 
 <script>
 'use strict';
-const APP_V='1.16';
-const APP_NEWS='Íntimo: importar tareas en bloque pegando una lista o desde un archivo .txt';
+const APP_V='1.17';
+const APP_NEWS='Importador mejorado, borrar tareas (todas o por categoría) y lista agrupada por categorías';
 /* ================= Datos ================= */
 const KEY='lumi_v1';
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
@@ -545,7 +545,7 @@ function retoHoy(){const t=ymd(),pool=retoPool();if(!pool.length)return null;
   return S.retoPick}
 
 /* ================= Vistas ================= */
-let view='hoy',dseg='entradas',metric='cintura',wf='todo',ilvl=0,drawn=null,icat='',intShown=false;
+let view='hoy',dseg='entradas',metric='cintura',wf='todo',ilvl=0,drawn=null,icat='',intShown=false,iexp=null;
 const VIEWS={hoy:vHoy,diario:vDiario,rutinas:vRutinas,voz:vVoz,mas:vMas,armario:vArmario,salud:vSalud,intimo:vIntimo,retos:vRetos,chat:vChat,ia:vIA,entreno:vEntreno,progreso:vProgreso,ajustes:vAjustes};
 const MAS=['armario','salud','intimo','retos','ajustes','chat','ia','entreno','progreso'];
 function go(v){if(v!==view)stopMic();view=v;drawn=null;render();window.scrollTo(0,0)}
@@ -716,10 +716,24 @@ function vSalud(){
 }
 
 const FL=['','🔥','🔥🔥','🔥🔥🔥'];
-function parseImport(txt){return String(txt||'').split(/\r?\n/).map(l=>{l=l.trim();if(!l)return null;
-  const f=(l.match(/🔥/g)||[]).length;let mins=0;const m=l.match(/\((\d{1,3})\s*(min|mins|minutos|m)\.?\)/i);if(m)mins=+m[1];
-  l=l.replace(/🔥/g,'').replace(/\(\d{1,3}\s*(min|mins|minutos|m)\.?\)/i,'').replace(/^\s*(\d+\s*[.)\-:]|[-•*·–—]|\[\s?\]|☐)\s*/,'').trim();
-  return l.length>2?{text:l.slice(0,400),lvl:f?Math.min(3,f):0,mins}:null}).filter(Boolean)}
+function parseImport(txt){
+  const raw=String(txt||'').split(/\r?\n/);
+  const NUM=/^\s*(?:\[\s?[xX✓]?\s?\]|☐|☑|✅)?\s*\d{1,4}\s*[.)\-:]\s+/;
+  const listMode=raw.filter(l=>NUM.test(l)).length>=3;
+  const SEC=/^\s*([A-Z]{1,2})[.)]\s+([^.]{3,}?)\s*(?:\(\s*\d+\s*[-–]\s*\d+\s*\))?\s*$/;
+  let sec='';const out=[];
+  for(let l of raw){
+    const t=l.trim();if(!t)continue;
+    if(/^[=\-_*~#·.\s]{3,}$/.test(t))continue;
+    if(/\.{4,}|_{3,}/.test(t))continue;
+    const m=t.match(SEC);if(m&&!NUM.test(t)){const n=m[2].trim().toLowerCase();sec=n.charAt(0).toUpperCase()+n.slice(1);continue}
+    if(listMode&&!NUM.test(t))continue;
+    if(!listMode&&/:\s*$/.test(t))continue;
+    const f=(t.match(/🔥/g)||[]).length;let mins=0;const mm=t.match(/\((\d{1,3})\s*(min|mins|minutos|m)\.?\)/i);if(mm)mins=+mm[1];
+    let x=t.replace(/🔥/g,'').replace(/\(\d{1,3}\s*(min|mins|minutos|m)\.?\)/i,'').replace(NUM,'').replace(/^\s*(?:\[\s?[xX✓]?\s?\]|☐|☑|[-•*·–—])\s*/,'').trim();
+    x=x.replace(/\s+([.,;:!?])/g,'$1').replace(/\s{2,}/g,' ').trim();
+    if(x.length>2)out.push({text:x.slice(0,400),lvl:f?Math.min(3,f):0,mins,sec})}
+  return out}
 function intHoy(){if(!S.intimate.length)return null;const t=ymd();
   if(!S.intPick||S.intPick.date!==t||!S.intimate.some(x=>x.id===S.intPick.id)){const it=S.intimate[Math.floor(Math.random()*S.intimate.length)];S.intPick={date:t,id:it.id,done:false};save()}
   return {...S.intPick,item:S.intimate.find(x=>x.id===S.intPick.id)}}
@@ -734,8 +748,12 @@ function vIntimo(){
   <div class="chips">${[0,1,2,3].map(l=>`<button class="chip ${ilvl===l?'on':''}" data-act="ilvl" data-l="${l}">${l?FL[l]:'Cualquier nivel'}</button>`).join('')}</div>
   ${drawn?`<div class="drawn">${esc(drawn.text)}<div style="font-size:14px;margin-top:8px">${FL[drawn.lvl]||''}${drawn.cat?' · '+esc(drawn.cat):''}</div>${drawn.mins?`<button class="btn sm" style="margin-top:12px;background:rgba(255,255,255,.18)" data-act="gTimer" data-s="${drawn.mins*60}">▶ ${mmss(drawn.mins*60)}</button>`:''}</div><div class="row"><button class="btn block" data-act="intDone">✓ Hecha</button><button class="btn ghost block" data-act="drawInt">Otra</button></div>`:`<button class="btn block" data-act="drawInt" ${pool.length?'':'disabled style="opacity:.5"'}>🎲 Sacar al azar (${pool.length})</button>`}</div>`;
   h+=`<div class="card"><div class="li"><div class="grow"><b>Reto íntimo del día</b><div class="mute small">Te sale cada día en Hoy, tapado. Solo se ve si lo tocas.</div></div><button class="sw ${S.settings.intDaily?'on':''}" data-act="intDaily"></button></div></div>`;
-  h+=`<div class="card"><h2>Mis tareas <span class="row" style="gap:6px"><button class="btn sm soft" data-act="intCats">Categorías</button><button class="btn sm soft" data-act="intImport">📥 Importar</button><button class="btn sm" data-act="editInt">＋</button></span></h2><p class="small mute" style="margin:0 0 10px">Tú escribes tus tareas. Se guardan solo en este dispositivo.</p>
-  ${S.intimate.map(i=>`<div class="li"><div class="grow">${esc(i.text)}<div class="small">${FL[i.lvl]||''}${i.cat?` <span class="tag l" style="margin:0 0 0 4px">${esc(i.cat)}</span>`:''}${i.mins?` <span class="mute">· ⏱ ${i.mins} min</span>`:''}</div></div><button class="x" data-act="editInt" data-id="${i.id}">✎</button><button class="x" data-act="delInt" data-id="${i.id}">✕</button></div>`).join('')||'<div class="empty">Todavía no has escrito ninguna.</div>'}</div>`;
+  h+=`<div class="card"><h2>Mis tareas <span class="row" style="gap:6px"><button class="btn sm soft" data-act="intCats">Categorías</button><button class="btn sm soft" data-act="intImport">📥 Importar</button>${S.intimate.length?'<button class="btn sm soft" data-act="intBulkDel">🗑</button>':''}<button class="btn sm" data-act="editInt">＋</button></span></h2><p class="small mute" style="margin:0 0 10px">Tú escribes tus tareas. Se guardan solo en este dispositivo.</p>
+  ${(()=>{const row=i=>`<div class="li"><div class="grow">${esc(i.text)}<div class="small">${FL[i.lvl]||''}${i.cat?` <span class="tag l" style="margin:0 0 0 4px">${esc(i.cat)}</span>`:''}${i.mins?` <span class="mute">· ⏱ ${i.mins} min</span>`:''}</div></div><button class="x" data-act="editInt" data-id="${i.id}">✎</button><button class="x" data-act="delInt" data-id="${i.id}">✕</button></div>`;
+    if(!S.intimate.length)return '<div class="empty">Todavía no has escrito ninguna.</div>';
+    if(S.intimate.length<=20)return S.intimate.map(row).join('');
+    const groups=[...(S.intCats||[]),''].map(c=>[c,S.intimate.filter(i=>(i.cat||'')===c)]).filter(g=>g[1].length);
+    return `<div class="small mute" style="margin-bottom:6px">${S.intimate.length} tareas · toca una categoría para verlas</div>`+groups.map(([c,l])=>`<button class="li" style="width:100%;border:0;border-bottom:1px solid var(--line);background:none;color:inherit;font:inherit;cursor:pointer;text-align:left" data-act="iexp" data-c="${esc(c)}"><div class="grow"><b>${esc(c||'Sin categoría')}</b></div><span class="tag l" style="margin:0">${l.length}</span><span class="mute" style="margin-left:8px">${iexp===c?'▾':'›'}</span></button>${iexp===c?`<div style="padding-left:6px;border-left:3px solid var(--rose-l);margin:6px 0 10px">${l.map(row).join('')}</div>`:''}`).join('')})()}</div>`;
   if(S.intimateLog.length){const days=daysBack(28),cnt={};S.intimateLog.forEach(l=>cnt[l.date]=(cnt[l.date]||0)+1);
     h+=`<div class="card"><h2>📅 Últimas 4 semanas <button class="btn sm soft" data-act="clearIntLog">Borrar</button></h2>
     <div class="week" style="gap:5px">${days.map(d=>`<div><i style="width:100%;height:30px;border-radius:9px;margin:0;${cnt[d]?`background:rgba(196,87,126,${Math.min(1,.35+cnt[d]*.25)})`:''}" title="${d}"></i></div>`).join('')}</div>
@@ -1068,12 +1086,28 @@ const ACT={
     <label class="f">O desde un archivo de texto (.txt)</label><input type="file" id="impFile" accept=".txt,text/plain">
     <div class="grid2"><div><label class="f">Categoría</label><select id="impCat"><option value="">Sin categoría</option>${cats.map(c=>`<option ${icat===c?'selected':''}>${esc(c)}</option>`).join('')}</select></div>
     <div><label class="f">Nivel por defecto</label><select id="impLvl">${[1,2,3].map(l=>`<option value="${l}">${FL[l]}</option>`).join('')}</select></div></div>
+    <label class="li" style="cursor:pointer;gap:10px"><input type="checkbox" id="impSec" checked style="width:auto"><div class="grow small">Crear categorías con las secciones del archivo (si las tiene). Si no, usa la categoría elegida.</div></label>
     <p class="small mute" id="impCount" style="margin-top:10px"></p>
     <div class="actions"><button class="btn soft" data-act="close">Cancelar</button><button class="btn" data-act="intImportGo">Importar</button></div>`)},
   intImportGo:()=>{const lines=parseImport(fv('impText'));if(!lines.length)return toast('Pega al menos una tarea');
     const ex=new Set(S.intimate.map(x=>x.text.toLowerCase()));const cat=fv('impCat'),dl=+fv('impLvl')||1;let n=0;
-    for(const l of lines){if(ex.has(l.text.toLowerCase()))continue;ex.add(l.text.toLowerCase());S.intimate.push({id:uid(),text:l.text,lvl:l.lvl||dl,cat,mins:l.mins||0});n++}
+    const bySec=$('#impSec')&&$('#impSec').checked;S.intCats=S.intCats||[];
+    for(const l of lines){if(ex.has(l.text.toLowerCase()))continue;ex.add(l.text.toLowerCase());let c=cat;
+      if(bySec&&l.sec){c=l.sec.slice(0,40);if(!S.intCats.includes(c))S.intCats.push(c)}
+      S.intimate.push({id:uid(),text:l.text,lvl:l.lvl||dl,cat:c,mins:l.mins||0});n++}
     save();closeSheet();render();toast(n?`${n} tareas importadas ✓`:'Ya las tenías todas')},
+  iexp:el=>{iexp=iexp===el.dataset.c?null:el.dataset.c;render()},
+  intBulkDel:()=>{const groups=[...(S.intCats||[]),''].map(c=>[c,S.intimate.filter(i=>(i.cat||'')===c).length]).filter(g=>g[1]);
+    sheet(`<h3>🗑 Borrar tareas</h3><p class="small mute" style="margin-top:-4px">No se puede deshacer. Si quieres, haz antes una copia en Ajustes.</p>
+    <div class="card">${groups.map(([c,n])=>`<div class="li"><div class="grow"><b>${esc(c||'Sin categoría')}</b><div class="small mute">${n} tareas</div></div><button class="btn sm danger" data-act="intDelCat" data-c="${esc(c)}">Borrar</button></div>`).join('')}</div>
+    <button class="btn danger block" data-act="intDelAll">Borrar TODAS las tareas (${S.intimate.length})</button>
+    <label class="li" style="cursor:pointer;gap:10px;margin-top:8px"><input type="checkbox" id="delCatsToo" style="width:auto"><div class="grow small">Borrar también las categorías vacías</div></label>
+    <div class="actions"><button class="btn soft" data-act="close">Cancelar</button></div>`)},
+  intDelCat:el=>{const c=el.dataset.c,n=S.intimate.filter(i=>(i.cat||'')===c).length;if(!confirm(`¿Borrar las ${n} tareas de "${c||'Sin categoría'}"?`))return;
+    const rm=$('#delCatsToo')&&$('#delCatsToo').checked;S.intimate=S.intimate.filter(i=>(i.cat||'')!==c);if(rm&&c)S.intCats=(S.intCats||[]).filter(x=>x!==c);
+    if(drawn&&!S.intimate.includes(drawn))drawn=null;if(iexp===c)iexp=null;save();closeSheet();render();toast(n+' tareas borradas')},
+  intDelAll:()=>{const n=S.intimate.length;if(!confirm(`¿Borrar las ${n} tareas? No se puede deshacer.`))return;
+    const rm=$('#delCatsToo')&&$('#delCatsToo').checked;S.intimate=[];if(rm)S.intCats=[];drawn=null;iexp=null;S.intPick=null;save();closeSheet();render();toast(n+' tareas borradas')},
   intCats:()=>{const c=S.intCats||[];sheet(`<h3>Categorías</h3><div class="card">${c.map((x,k)=>`<div class="li"><div class="grow">${esc(x)}</div><button class="x" data-act="intCatDel" data-i="${k}">✕</button></div>`).join('')||'<div class="empty">Sin categorías</div>'}</div>
     <label class="f">Nueva categoría</label><div class="row"><input id="iCatIn" placeholder="El nombre que quieras"><button class="btn" data-act="intCatAdd">＋</button></div><div class="actions"><button class="btn soft" data-act="close">Cerrar</button></div>`)},
   intCatAdd:()=>{const v=fv('iCatIn');if(!v)return;S.intCats=S.intCats||[];if(!S.intCats.includes(v))S.intCats.push(v);save();ACT.intCats();render()},
@@ -1110,7 +1144,7 @@ $('#importFile').addEventListener('change',async e=>{const f=e.target.files[0];e
 
 document.addEventListener('click',e=>{const el=e.target.closest('[data-act]');if(!el)return;const f=ACT[el.dataset.act];if(f){e.preventDefault();f(el,e)}});
 document.addEventListener('keydown',e=>{if(e.target.id==='aiIn'&&e.key==='Enter'&&!e.shiftKey){e.preventDefault();ACT.aiSend()}});
-document.addEventListener('input',e=>{if(e.target.id==='impText'){const c=$('#impCount');if(c){const n=parseImport(e.target.value).length;c.textContent=n?`Se van a importar ${n} tareas.`:''}}});
+document.addEventListener('input',e=>{if(e.target.id==='impText'){const c=$('#impCount');if(c){const L=parseImport(e.target.value),n=L.length,sc=new Set(L.map(x=>x.sec).filter(Boolean)).size;c.textContent=n?`Se van a importar ${n} tareas${sc?' en '+sc+' secciones':''}.`:''}}});
 document.addEventListener('change',async e=>{if(e.target.id==='impFile'&&e.target.files&&e.target.files[0]){const t=await e.target.files[0].text();const ta=$('#impText');if(ta){ta.value=(ta.value?ta.value+'\n':'')+t;ta.dispatchEvent(new Event('input',{bubbles:true}))}return}const pv=e.target.dataset&&e.target.dataset.prev;if(pv&&e.target.files&&e.target.files[0]){const box=document.getElementById(pv);if(box)box.innerHTML=`<img src="${URL.createObjectURL(e.target.files[0])}" style="width:100%;height:100%;object-fit:cover">`}if(e.target.dataset.chg==='name'){S.settings.name=e.target.value.trim();save();toast('Guardado ✓')}});
 
 function stageOpts(act){return STAGES.slice(1).map((s,i)=>`<button class="chk ${S.stage===i+1?'sel':''}" data-act="${act}" data-s="${i+1}"><span class="ic">${s.e}</span><span class="tx"><b>${s.n}</b><small>${s.d}</small></span></button>`).join('')}
