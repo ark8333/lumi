@@ -162,8 +162,8 @@ html.dark #toast{background:#f3e6ee;color:#17101a}
 
 <script>
 'use strict';
-const APP_V='1.11';
-const APP_NEWS='La IA escribe en directo: las guías y el chat aparecen mientras se escriben, y la guía del reto se prepara sola';
+const APP_V='1.12';
+const APP_NEWS='Antes y después, resumen semanal, Valeria con memoria, IA más estable y Hoy más limpio';
 /* ================= Datos ================= */
 const KEY='lumi_v1';
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
@@ -275,24 +275,27 @@ function routineBtn(r){const ok=isDone(r);const b=`<button class="chk ${ok?'on':
 const hasAI=()=>!!S.settings.aiKey;
 let aiBusy=false,tipLoading=false;
 async function ai(messages,max=500,temp=.9,retry=1){
-  max=Math.max(max,1500);
-  const r=await fetch('https://openrouter.ai/api/v1/chat/completions',{method:'POST',
-    headers:{'Authorization':'Bearer '+S.settings.aiKey,'Content-Type':'application/json','X-Title':'Lumi'},
-    body:JSON.stringify({model:S.settings.aiModel||'openrouter/free',messages,max_tokens:max,temperature:temp})});
-  const j=await r.json().catch(()=>({}));
-  if(!r.ok)throw new Error(r.status===401?'La clave no es válida':r.status===429?'Límite de uso alcanzado, prueba más tarde':((j.error&&j.error.message)||'Error '+r.status));
+  max=Math.max(max,1500);const ctl=new AbortController(),to=setTimeout(()=>ctl.abort(),45000);let r,j;
+  try{r=await fetch('https://openrouter.ai/api/v1/chat/completions',{method:'POST',signal:ctl.signal,
+      headers:{'Authorization':'Bearer '+S.settings.aiKey,'Content-Type':'application/json','X-Title':'Lumi'},
+      body:JSON.stringify({model:S.settings.aiModel||'openrouter/free',messages,max_tokens:max,temperature:temp})});
+    j=await r.json().catch(()=>({}))}
+  catch(e){clearTimeout(to);if(retry>0)return ai(messages,max,temp,retry-1);throw new Error(e.name==='AbortError'?'La IA está tardando demasiado, prueba otra vez':'Sin conexión')}
+  clearTimeout(to);
+  if(!r.ok){if(retry>0&&r.status!==401&&r.status!==429)return ai(messages,max,temp,retry-1);throw new Error(aiErr(r.status,j))}
   const t=((((j.choices||[])[0]||{}).message||{}).content||'').replace(/<think>[\s\S]*?<\/think>/g,'').trim();
   if(!t&&retry>0)return ai(messages,max,temp,retry-1);
   return t;
 }
 function aiErr(st,j){return st===401?'La clave no es válida':st===429?'Límite de uso alcanzado, prueba más tarde':((j&&j.error&&j.error.message)||'Error '+st)}
-async function aiStream(messages,onDelta,max=1500,temp=.7){
-  const ctl=new AbortController(),to=setTimeout(()=>ctl.abort(),90000);
+async function aiStream(messages,onDelta,max=1500,temp=.7,retry=1){
+  const ctl=new AbortController();let alive=false,why='';
+  const to=setTimeout(()=>{why='total';ctl.abort()},90000),ft=setTimeout(()=>{if(!alive){why='slow';ctl.abort()}},25000);
   try{
     const r=await fetch('https://openrouter.ai/api/v1/chat/completions',{method:'POST',signal:ctl.signal,
       headers:{'Authorization':'Bearer '+S.settings.aiKey,'Content-Type':'application/json','X-Title':'Lumi'},
       body:JSON.stringify({model:S.settings.aiModel||'openrouter/free',messages,max_tokens:Math.max(max,1500),temperature:temp,stream:true})});
-    if(!r.ok){const j=await r.json().catch(()=>({}));throw new Error(aiErr(r.status,j))}
+    if(!r.ok){const j=await r.json().catch(()=>({}));if(retry>0&&r.status!==401&&r.status!==429)return aiStream(messages,onDelta,max,temp,retry-1);throw new Error(aiErr(r.status,j))}
     if(!r.body||!r.body.getReader){const j=await r.json().catch(()=>({}));const t=((((j.choices||[])[0]||{}).message||{}).content||'');onDelta&&onDelta(t);return t.replace(/<think>[\s\S]*?<\/think>/g,'').trim()}
     const rd=r.body.getReader(),dec=new TextDecoder();let buf='',full='';
     for(;;){const {done,value}=await rd.read();if(done)break;buf+=dec.decode(value,{stream:true});let i;
@@ -300,10 +303,16 @@ async function aiStream(messages,onDelta,max=1500,temp=.7){
         if(!line.startsWith('data:'))continue;const d=line.slice(5).trim();if(!d||d==='[DONE]')continue;
         let j;try{j=JSON.parse(d)}catch(e){continue}
         if(j.error)throw new Error(j.error.message||'Error de la IA');
+        if(j.choices)alive=true;
         const c=(((j.choices||[])[0]||{}).delta||{}).content;if(c){full+=c;onDelta&&onDelta(full)}}}
-    return full.replace(/<think>[\s\S]*?<\/think>/g,'').trim();
-  }catch(e){if(e.name==='AbortError')throw new Error('La IA está tardando demasiado, prueba otra vez');throw e}
-  finally{clearTimeout(to)}}
+    const out=full.replace(/<think>[\s\S]*?<\/think>/g,'').trim();
+    if(!out&&retry>0)return aiStream(messages,onDelta,max,temp,retry-1);
+    return out;
+  }catch(e){
+    if(e.name==='AbortError'){if(why==='slow'&&retry>0)return aiStream(messages,onDelta,max,temp,retry-1);throw new Error('La IA está tardando demasiado, prueba otra vez')}
+    if(retry>0&&/fetch|network|Failed/i.test(e.message||''))return aiStream(messages,onDelta,max,temp,retry-1);
+    throw e}
+  finally{clearTimeout(to);clearTimeout(ft)}}
 function aiCtx(){
   const st=STAGES[S.stage],last=[...S.journal].sort((a,b)=>a.date<b.date?1:-1)[0];
   return `Datos de la usuaria: se llama ${S.settings.name||'(sin nombre todavía)'}. Etapa ${S.stage||1} de 4: ${st?st.n+' ('+st.d+')':'Descubrir'}. `+
@@ -315,6 +324,7 @@ function aiCtx(){
   `Plan de entreno: ${plan().title}: ${plan().days.map((d,i)=>'Día '+(i+1)+' '+d.name).join(', ')}. `+
   `Minutos de voz esta semana: ${S.voiceLog.filter(l=>l.date>=weekStart()).reduce((a,l)=>a+l.mins,0)}. `+
   `Próximas citas: ${S.appts.filter(a=>a.date>=ymd()).map(a=>a.date+' '+a.text).join(' | ')||'ninguna'}. `+
+  `Lo que recuerdas de ella (tu memoria): ${(S.memo||[]).join(' | ')||'nada todavía'}. `+
   `Últimas medidas: ${(()=>{const m=[...S.measures].sort((a,b)=>a.date<b.date?1:-1)[0];return m?MF.filter(f=>m[f[0]]).map(f=>f[1]+' '+m[f[0]]+f[2]).join(', '):'ninguna'})()}.`;
 }
 const ACT_SYS=`Eres como Jarvis para la app Lumi: además de responder, puedes MANEJAR la app. Cuando la usuaria te pida hacer, apuntar, crear, cambiar o marcar algo, hazlo añadiendo AL FINAL de tu respuesta un bloque exactamente así:
@@ -334,6 +344,9 @@ Tipos disponibles (usa solo estos):
 - {"tipo":"ejercicio_voz","nombre":"texto","minutos":5,"consejo":"texto"}
 - {"tipo":"plan_entreno","title":"texto","note":"texto","days":[{"name":"texto","ex":[{"n":"ejercicio","s":3,"r":"12","t":"consejo"}]}]}
 - {"tipo":"etapa","numero":1}
+- {"tipo":"recordar","dato":"dato corto sobre ella"}
+- {"tipo":"olvidar","dato":"dato que ya no es cierto"}
+Memoria: cuando te cuente algo duradero sobre ella (tipo de piel, tallas, gustos de estilo, material que tiene, horarios, objetivos, cosas que no le gustan), guárdalo con "recordar" sin preguntar, sin repetir lo que ya está en tu memoria. Si algo cambia, usa "olvidar" con lo viejo y "recordar" con lo nuevo.
 Reglas: usa solo datos que ella te dé (no inventes medidas ni fechas); si solo pregunta algo, no pongas el bloque; puedes poner varias acciones; di en una frase corta lo que has hecho. Nunca menciones el bloque ni su formato.`;
 const findR=n=>{n=String(n||'').toLowerCase();return S.routines.find(r=>r.name.toLowerCase()===n)||S.routines.find(r=>r.name.toLowerCase().includes(n)||n.includes(r.name.toLowerCase()))};
 function runActs(list){const out=[];if(!Array.isArray(list))return out;const t=ymd();
@@ -351,6 +364,8 @@ function runActs(list){const out=[];if(!Array.isArray(list))return out;const t=y
     case 'cita':if(a.texto&&/^\d{4}-\d{2}-\d{2}$/.test(a.fecha||'')){S.appts.push({id:uid(),date:a.fecha,text:String(a.texto)});out.push('Cita apuntada: '+fmt(a.fecha))}break;
     case 'ejercicio_voz':if(a.nombre){S.voiceEx.push({id:uid(),name:String(a.nombre),mins:Math.max(1,parseInt(a.minutos)||5),tip:a.consejo||''});out.push('Ejercicio de voz añadido')}break;
     case 'plan_entreno':{const p=parsePlan(JSON.stringify(a));if(p){p.date=t;S.plan=p;S.planManual=false;eday=0;if(S.planLog)S.planLog[t]=[];out.push('Plan de entreno nuevo')}break}
+    case 'recordar':if(a.dato){S.memo=S.memo||[];const d=String(a.dato).slice(0,160);if(!S.memo.some(x=>x.toLowerCase()===d.toLowerCase())){S.memo.push(d);if(S.memo.length>40)S.memo.shift();out.push('🧠 Lo recordaré: '+d)}}break;
+    case 'olvidar':if(a.dato&&S.memo){const d=String(a.dato).toLowerCase();const n=S.memo.length;S.memo=S.memo.filter(x=>!(x.toLowerCase().includes(d)||d.includes(x.toLowerCase())));if(S.memo.length<n)out.push('🧠 Olvidado')}break;
     case 'etapa':{const n=parseInt(a.numero);if(n>=1&&n<=4){S.stage=n;S.retoPick=null;out.push('Etapa: '+STAGES[n].n)}break}
   }}catch(e){}}
   if(out.length)save();return out}
@@ -359,7 +374,34 @@ function splitActs(t){let acts=[];const m=t.match(/<acciones>([\s\S]*?)<\/accion
   return {text:t.replace(/<acciones>[\s\S]*?(<\/acciones>|$)/ig,'').trim(),acts}}
 function speak(t){try{if(!S.settings.tts||!window.speechSynthesis)return;speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t.replace(/[*#_`>]/g,'').slice(0,600));u.lang='es-ES';
   const v=speechSynthesis.getVoices().filter(v=>/^es/i.test(v.lang));const f=v.find(v=>/female|mujer|helena|elvira|lucia|monica|paulina|laura/i.test(v.name))||v[0];if(f)u.voice=f;u.rate=1.02;speechSynthesis.speak(u)}catch(e){}}
-let retoAuto=false,planAuto=false;
+let retoAuto=false,planAuto=false,weeklyLoading=false,showDone=false;
+function weekStats(ws){ws=ws||weekStart();const we=(()=>{const d=dt(ws);d.setDate(d.getDate()+6);return ymd(d)})();const inW=d=>d>=ws&&d<=we;
+  const dia=S.journal.filter(e=>inW(e.date));
+  return {rut:Object.keys(S.checks).filter(inW).reduce((a,d)=>a+S.checks[d].length,0),retos:S.retosLog.filter(l=>inW(l.date)).length,
+    ent:Object.keys(S.planLog||{}).filter(d=>inW(d)&&S.planLog[d].length).length,voz:S.voiceLog.filter(l=>inW(l.date)).reduce((a,l)=>a+l.mins,0),
+    dia:dia.length,moods:dia.map(e=>e.mood).join(''),med:S.measures.filter(m=>inW(m.date)).length}}
+async function loadWeekly(force){
+  if(!hasAI()||weeklyLoading)return;const ws=weekStart();if(!force&&S.weekly&&S.weekly.week===ws)return;weeklyLoading=true;if(force&&(view==='progreso'||view==='hoy'))render();
+  try{const w=weekStats(ws);
+    const t=await ai([{role:'system',content:AI_SYS},{role:'user',content:aiCtx()+`\n\nDatos de esta semana: ${w.rut} rutinas hechas, ${w.retos} retos conseguidos, ${w.ent} días con entreno, ${w.voz} minutos de voz, ${w.dia} entradas de diario ${w.moods}, ${w.med} registros de medidas.\nEscríbele su resumen semanal: qué ha ido bien, qué puede mejorar y 1 o 2 objetivos concretos para la próxima semana. Cercano, motivador y sincero. Máximo 90 palabras, sin títulos.`}],600,.8);
+    if(t){S.weekly={week:ws,text:t,date:ymd()};save()}}catch(e){if(force)toast(e.message||'No se pudo conectar')}
+  weeklyLoading=false;if(view==='hoy'||view==='progreso')render()}
+function firstDate(){const ds=[...Object.keys(S.checks),...S.journal.map(e=>e.date),...S.measures.map(m=>m.date),...S.retosLog.map(l=>l.date)].filter(Boolean).sort();return ds[0]||ymd()}
+function vProgreso(){
+  let h=head('Progreso','Antes y después','mas');
+  const days=Math.round((dt(ymd())-dt(firstDate()))/864e5)+1,totR=Object.values(S.checks).reduce((a,x)=>a+x.length,0),voz=S.voiceLog.reduce((a,l)=>a+l.mins,0);
+  h+=`<div class="card"><div class="stat"><div><b>${days}</b><span>días contigo</span></div><div><b>${S.retosLog.length}</b><span>retos</span></div><div><b>${totR}</b><span>rutinas</span></div></div><div class="stat" style="margin-top:10px"><div><b>${S.planDone||0}</b><span>entrenos</span></div><div><b>${voz}</b><span>min de voz</span></div><div><b>${S.stage||1}/4</b><span>etapa</span></div></div></div>`;
+  if(hasAI()){const w=S.weekly&&S.weekly.week===weekStart()?S.weekly:null;
+    h+=`<div class="card"><h2>📊 Tu semana <button class="btn sm ghost" data-act="weekly">${weeklyLoading?'Escribiendo…':w?'Actualizar':'Pedir resumen'}</button></h2>${w?`<div style="font:500 16px/1.5 var(--serif);white-space:pre-wrap">${esc(w.text)}</div>`:'<div class="small mute">Valeria te escribe un resumen cada domingo. Puedes pedírselo cuando quieras.</div>'}</div>`}
+  const ph=S.journal.filter(e=>e.photo).sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:(a.ts||0)-(b.ts||0));
+  h+=`<div class="card"><h2>📸 Fotos</h2>${ph.length>=2?`<div class="grid2" style="gap:10px">${[ph[0],ph[ph.length-1]].map((e,i)=>`<div><div class="small mute" style="margin-bottom:4px">${i?'Ahora':'Antes'} · ${fmt(e.date)}</div><img class="photo" style="margin:0;aspect-ratio:3/4;max-height:none" data-media="${e.photo}" alt=""></div>`).join('')}</div>`:'<div class="empty">Añade fotos en tu Diario. Cuando tengas dos, aquí verás la primera al lado de la última.</div>'}</div>`;
+  const ms=[...S.measures].sort((a,b)=>a.date<b.date?-1:1);
+  const rows=MF.map(f=>{const w=ms.filter(m=>m[f[0]]);if(w.length<2)return '';const a=w[0][f[0]],b=w[w.length-1][f[0]],d=+(b-a).toFixed(1);
+    return `<div class="li"><div class="grow"><b>${f[1]}</b><div class="small mute">${fmt(w[0].date)} → ${fmt(w[w.length-1].date)}</div></div><span>${a} → <b>${b}</b> ${f[2]}</span><span class="tag ${d<0?'l':''}" style="margin:0 0 0 8px">${d>0?'+':''}${d}</span></div>`}).join('');
+  h+=`<div class="card"><h2>📏 Medidas</h2>${rows||'<div class="empty">Apunta tus medidas al menos dos veces para ver el cambio.</div>'}</div>`;
+  const rc=[...S.recs].sort((a,b)=>a.date<b.date?-1:1);
+  h+=`<div class="card"><h2>🎤 Voz</h2>${rc.length>=2?[rc[0],rc[rc.length-1]].map((r,i)=>`<div class="li" style="flex-wrap:wrap"><div class="grow"><b>${i?'Ahora':'Antes'}</b> <span class="small mute">${fmt(r.date)}</span><audio controls preload="none" data-media="${r.media}"></audio></div></div>`).join(''):'<div class="empty">Grábate en la sección Voz. Con dos grabaciones podrás escuchar la primera y la última seguidas.</div>'}</div>`;
+  return h}
 /* ---- Guías paso a paso ---- */
 function parseGuide(t){const m=(t||'').match(/\{[\s\S]*\}/);if(!m)return null;let j;try{j=JSON.parse(m[0])}catch(e){return null}
   const pasos=(Array.isArray(j.pasos)?j.pasos:[]).slice(0,12).map(p=>({t:String(p.t||p.titulo||''),d:String(p.d||p.texto||''),seg:Math.max(0,Math.min(3600,parseInt(p.seg)||0))})).filter(p=>p.t||p.d);
@@ -485,8 +527,8 @@ function retoHoy(){const t=ymd(),pool=retoPool();if(!pool.length)return null;
 
 /* ================= Vistas ================= */
 let view='hoy',dseg='entradas',metric='cintura',wf='todo',ilvl=0,drawn=null;
-const VIEWS={hoy:vHoy,diario:vDiario,rutinas:vRutinas,voz:vVoz,mas:vMas,armario:vArmario,salud:vSalud,intimo:vIntimo,retos:vRetos,chat:vChat,ia:vIA,entreno:vEntreno,ajustes:vAjustes};
-const MAS=['armario','salud','intimo','retos','ajustes','chat','ia','entreno'];
+const VIEWS={hoy:vHoy,diario:vDiario,rutinas:vRutinas,voz:vVoz,mas:vMas,armario:vArmario,salud:vSalud,intimo:vIntimo,retos:vRetos,chat:vChat,ia:vIA,entreno:vEntreno,progreso:vProgreso,ajustes:vAjustes};
+const MAS=['armario','salud','intimo','retos','ajustes','chat','ia','entreno','progreso'];
 function go(v){if(v!==view)stopMic();view=v;drawn=null;render();window.scrollTo(0,0)}
 function applyTheme(){const t=S.settings.theme||'dark';const dark=t==='dark'||(t==='auto'&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches);
   document.documentElement.classList.toggle('dark',dark);const m=document.querySelector('meta[name=theme-color]');if(m)m.content=dark?'#17101a':'#fbf5f3'}
@@ -504,35 +546,41 @@ function render(){
 }
 
 function vHoy(){
-  const t=ymd(),n=S.settings.name;
-  const tot=S.routines.length,dn=S.routines.filter(isDone).length,pct=tot?dn/tot:0,C=2*Math.PI*34,st=streak();
+  const t=ymd(),n=S.settings.name,dow=new Date().getDay();
+  const tot=S.routines.length,dn=S.routines.filter(isDone).length,pct=tot?dn/tot:0,C=2*Math.PI*30,st=streak();
   let h=head(n?`Hola, ${esc(n)}`:'Hola ✿',fmtLong(new Date()));
   if(installEv&&!isInstalled()&&!S.settings.noInstall)h+=`<div class="card" style="border-color:var(--rose)"><div class="row between"><div><b>📲 Instálala como app</b><div class="small mute">Icono propio y pantalla completa</div></div><div class="row" style="gap:6px"><button class="btn sm soft" data-act="noInstall">Luego</button><button class="btn sm" data-act="install">Instalar</button></div></div></div>`;
-  if(!storageOK)h+=`<div class="warn">⚠️ Este navegador no deja guardar datos al abrir el archivo así. Lo que apuntes se perderá al cerrar. Usa <b>Exportar copia</b> en Ajustes o ábrelo de otra forma.</div>`;
-  h+=`<div class="card"><div class="row" style="gap:18px">
-    <svg width="86" height="86" viewBox="0 0 84 84"><defs><linearGradient id="g"><stop offset="0" stop-color="#c4577e"/><stop offset="1" stop-color="#8b6bbf"/></linearGradient></defs>
-    <circle cx="42" cy="42" r="34" fill="none" stroke="#f3e3ea" stroke-width="9"/>
-    <circle cx="42" cy="42" r="34" fill="none" stroke="url(#g)" stroke-width="9" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${C*(1-pct)}" transform="rotate(-90 42 42)" style="transition:stroke-dashoffset .4s"/>
-    <text x="42" y="48" text-anchor="middle" font-family="Georgia,serif" font-size="19" fill="#3b1e34">${Math.round(pct*100)}%</text></svg>
-    <div><div class="mute small">Tu cuidado de hoy</div><div style="font:500 22px var(--serif)">${dn} de ${tot} hechas</div><div class="mute small">🔥 Racha: ${st} día${st===1?'':'s'}</div></div></div></div>`;
-  const stg=STAGES[S.stage];
-  if(stg){const dn2=stageDone(),p2=Math.min(1,dn2/STAGE_GOAL);
-    h+=`<div class="card"><div class="row between"><div class="mute small">Tu etapa · ${S.stage} de 4</div><button class="btn sm soft" data-act="pickStage">Cambiar</button></div>
-    <div style="font:500 22px var(--serif);margin-top:2px">${stg.e} ${stg.n}</div><div class="mute small">${stg.d}</div>
-    <div class="bar"><i style="width:${p2*100}%"></i></div><div class="mute small">${Math.min(dn2,STAGE_GOAL)} de ${STAGE_GOAL} retos de esta etapa</div>
-    ${p2>=1&&S.stage<4?`<button class="btn block" style="margin-top:12px" data-act="nextStage">¿Lista? Pasar a ${STAGES[S.stage+1].e} ${STAGES[S.stage+1].n}</button>`:''}</div>`}
+  if(!storageOK)h+=`<div class="warn">⚠️ Este navegador no deja guardar datos al abrir el archivo así. Lo que apuntes se perderá al cerrar.</div>`;
+  const stg=STAGES[S.stage],dn2=stageDone(),p2=Math.min(1,dn2/STAGE_GOAL);
+  h+=`<div class="card"><div class="row" style="gap:16px">
+    <svg width="74" height="74" viewBox="0 0 74 74" style="flex:none"><defs><linearGradient id="g"><stop offset="0" stop-color="#c4577e"/><stop offset="1" stop-color="#8b6bbf"/></linearGradient></defs>
+    <circle cx="37" cy="37" r="30" fill="none" stroke="#f3e3ea" stroke-width="8"/>
+    <circle cx="37" cy="37" r="30" fill="none" stroke="url(#g)" stroke-width="8" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${C*(1-pct)}" transform="rotate(-90 37 37)" style="transition:stroke-dashoffset .4s"/>
+    <text x="37" y="43" text-anchor="middle" font-family="Georgia,serif" font-size="19" fill="#3b1e34">${Math.round(pct*100)}%</text></svg>
+    <div style="flex:1;min-width:0"><div style="font:500 20px var(--serif)">${dn} de ${tot} hechas</div><div class="mute small">🔥 Racha: ${st} día${st===1?'':'s'}</div>
+    ${stg?`<button style="all:unset;cursor:pointer;display:block;width:100%;margin-top:6px" data-act="go" data-v="retos"><div class="small">${stg.e} ${stg.n} · ${Math.min(dn2,STAGE_GOAL)}/${STAGE_GOAL} retos</div><div class="bar" style="margin:4px 0 0;height:6px"><i style="width:${p2*100}%"></i></div></button>`:''}</div></div>
+    ${stg&&p2>=1&&S.stage<4?`<button class="btn block" style="margin-top:12px" data-act="nextStage">¿Lista? Pasar a ${STAGES[S.stage+1].e} ${STAGES[S.stage+1].n}</button>`:''}</div>`;
   if(hasAI()){const tip=S.aiTip&&S.aiTip.date===t?S.aiTip.text:'';if(!tip)loadTip();
-    h+=`<div class="card"><h2>💌 Para ti hoy <button class="btn sm ghost" data-act="go" data-v="ia">Preguntar</button></h2><div style="font:500 17px/1.4 var(--serif)">${tip?esc(tip):'<span class="mute">Pensando algo para ti…</span>'}</div></div>`}
+    h+=`<div class="card" style="padding:14px 18px"><div class="row" style="align-items:flex-start;gap:10px"><span style="font-size:20px">💌</span><div style="flex:1;font:500 16px/1.4 var(--serif)">${tip?esc(tip):'<span class="mute">Pensando algo para ti…</span>'}</div></div></div>`;
+    const prevW=(()=>{const d=new Date();d.setDate(d.getDate()-7);return weekStart(d)})();
+    if(dow===0)loadWeekly();
+    const w=S.weekly&&((dow===0&&S.weekly.week===weekStart())||(dow===1&&S.weekly.week===prevW))?S.weekly:null;
+    if(w)h+=`<div class="card"><h2>📊 Tu semana <button class="btn sm ghost" data-act="go" data-v="progreso">Progreso</button></h2><div style="font:500 16px/1.5 var(--serif);white-space:pre-wrap">${esc(w.text)}</div></div>`;
+    else if(dow===0&&weeklyLoading)h+=`<div class="card"><h2>📊 Tu semana</h2><div class="mute">Valeria está escribiendo tu resumen…</div></div>`}
   const rp=retoHoy();
   if(rp){h+=`<div class="card reto"><h2>Reto del día ${rp.done?'· ✓ conseguido':''}${rp.ai?' · ✨ IA':''}</h2><p>${esc(rp.text)}</p><div class="row wrap">${rp.done?`<button class="btn" data-act="retoOtro">Otro reto</button>`:`<button class="btn w" data-act="retoDone">¡Hecho!</button><button class="btn" data-act="retoOtro">Cambiar</button>`}${hasAI()?`<button class="btn" data-act="retoAI">✨ Inventa uno</button>`:''}</div>${hasAI()?`<button class="btn w block" style="margin-top:10px" data-act="retoHow">📖 Cómo hacerlo</button>`:''}</div>`}
-  h+=`<div class="card"><h2>Rutinas <button class="btn sm ghost" data-act="go" data-v="rutinas">Editar</button></h2>${S.routines.length?S.routines.map(routineBtn).join(''):'<div class="empty">No tienes rutinas. Añádelas en Rutinas.</div>'}</div>`;
-  if(secOn('salud')&&S.meds.length){const ml=S.medLog[t]||[];h+=`<div class="card"><h2>Medicación de hoy</h2>${S.meds.map(m=>{const ok=ml.includes(m.id);return `<button class="chk ${ok?'on':''}" data-act="toggleM" data-id="${m.id}"><span class="ic">💊</span><span class="tx">${esc(m.name)}<small>${esc(m.dose)}${m.time?' · '+esc(m.time):''}</small></span><span class="tick">${ok?'✓':''}</span></button>`}).join('')}</div>`}
-  const next=S.appts.filter(a=>a.date>=t).sort((a,b)=>a.date<b.date?-1:1)[0];
-  if(secOn('salud')&&next)h+=`<div class="card"><h2>Próxima cita</h2><div style="font:500 19px var(--serif)">${esc(next.text)}</div><div class="mute small">${fmt(next.date)}${next.date===t?' · ¡hoy!':''}</div></div>`;
-  if(secOn('diario'))h+=`<div class="row"><button class="btn block" data-act="newEntry">＋ Diario</button><button class="btn ghost block" data-act="newMeasure">＋ Medidas</button></div>`;
+  if(secOn('entreno')){const P=plan(),d=(S.planDone||0)%P.days.length,D=P.days[d],hecho=S.planDoneDate===t;
+    h+=`<button class="tile" style="width:100%;margin-bottom:14px;display:flex;align-items:center;gap:14px" data-act="goEnt" data-d="${d}"><span style="font-size:28px">${hecho?'✅':'🏋️'}</span><span style="flex:1"><span class="small mute" style="display:block">${hecho?'Entreno de hoy hecho':'Entreno de hoy'}</span><b style="font-size:18px;margin:0">Día ${d+1}: ${esc(D.name)}</b><span>${D.ex.length} ejercicios</span></span><span style="font-size:22px" class="mute">›</span></button>`}
+  const pend=S.routines.filter(r=>!isDone(r)),hechas=S.routines.filter(isDone);
+  h+=`<div class="card"><h2>Pendiente hoy <button class="btn sm ghost" data-act="go" data-v="rutinas">Editar</button></h2>${pend.length?pend.map(routineBtn).join(''):(tot?'<div class="empty">🎉 ¡Todo hecho por hoy!</div>':'<div class="empty">No tienes rutinas. Añádelas en Rutinas o pídeselas a Valeria.</div>')}
+    ${hechas.length?`<button class="btn sm soft" style="margin-top:8px" data-act="showDone">${showDone?'Ocultar':'✓ '+hechas.length+' hecha'+(hechas.length===1?'':'s')+' · ver'}</button>${showDone?'<div style="margin-top:10px">'+hechas.map(routineBtn).join('')+'</div>':''}`:''}</div>`;
+  if(secOn('salud')&&S.meds.length){const ml=S.medLog[t]||[],pm=S.meds.filter(m=>!ml.includes(m.id));
+    if(pm.length)h+=`<div class="card"><h2>Medicación pendiente</h2>${pm.map(m=>`<button class="chk" data-act="toggleM" data-id="${m.id}"><span class="ic">💊</span><span class="tx">${esc(m.name)}<small>${esc(m.dose)}${m.time?' · '+esc(m.time):''}</small></span><span class="tick"></span></button>`).join('')}</div>`}
+  const in7=(()=>{const d=new Date();d.setDate(d.getDate()+7);return ymd(d)})();
+  const next=S.appts.filter(a=>a.date>=t&&a.date<=in7).sort((a,b)=>a.date<b.date?-1:1)[0];
+  if(secOn('salud')&&next)h+=`<div class="card" style="padding:14px 18px"><div class="row"><span style="font-size:20px">📅</span><div><b>${esc(next.text)}</b><div class="mute small">${next.date===t?'¡Hoy!':fmt(next.date)}</div></div></div></div>`;
   return h;
 }
-
 function vRutinas(){
   let h=head('Rutinas','Tu cuidado diario');
   const days=daysBack(7),daily=S.routines.filter(r=>r.freq!=='semanal');
@@ -593,7 +641,7 @@ function vVoz(){
 
 function vMas(){
   let h=head('Más','Todo lo tuyo');
-  const T=[['entreno','🏋️','Entreno',`${plan().days.length} días · ${plan().ai?'plan IA':'plan básico'}`],['armario','👗','Armario',`${S.wardrobe.length} prendas`],['salud','💊','Salud','Medicación y citas'],['intimo','🔒','Íntimo',`${S.intimate.length} tareas`],['retos','🌟','Retos',`${S.retosLog.length} conseguidos`],['ajustes','⚙️','Ajustes','Etapa, secciones, PIN']].filter(t=>!SECS.some(s=>s[0]===t[0])||secOn(t[0]));
+  const T=[['progreso','📈','Progreso','Antes y después'],['entreno','🏋️','Entreno',`${plan().days.length} días · ${plan().ai?'plan IA':'plan básico'}`],['armario','👗','Armario',`${S.wardrobe.length} prendas`],['salud','💊','Salud','Medicación y citas'],['intimo','🔒','Íntimo',`${S.intimate.length} tareas`],['retos','🌟','Retos',`${S.retosLog.length} conseguidos`],['ajustes','⚙️','Ajustes','Etapa, secciones, PIN']].filter(t=>!SECS.some(s=>s[0]===t[0])||secOn(t[0]));
   const bot=S.settings.botUrl;
   h+=`<div class="tiles"><button class="tile" data-act="go" data-v="ia"><div class="e">✨</div><b>Valeria IA</b><span>${hasAI()?'Chat dentro de Lumi':'Configurar IA'}</span></button>${bot?`<a class="tile" href="${esc(bot)}" target="_blank" rel="noopener noreferrer" style="text-decoration:none"><div class="e">💬</div><b>Chatbot</b><span>Hablar con tu asistente ↗</span></a>`:`<button class="tile" data-act="setBot"><div class="e">💬</div><b>Chatbot</b><span>Configurar</span></button>`}${T.map(t=>`<button class="tile" data-act="go" data-v="${t[0]}"><div class="e">${t[1]}</div><b>${t[2]}</b><span>${t[3]}</span></button>`).join('')}</div>`;
   return h;
@@ -646,7 +694,7 @@ function vIA(){
   let h=head('Valeria ✨','Tu asistente con IA','mas');
   if(!hasAI())return h+`<div class="card"><p style="margin-top:0">Para usar a Valeria necesitas poner tu clave de OpenRouter.</p><button class="btn block" data-act="go" data-v="ajustes">Ir a Ajustes</button></div>`;
   const ms=S.aiChat||[];
-  h+=`<div class="row" style="justify-content:flex-end;margin:-8px 0 10px"><button class="btn sm ${S.settings.tts?'':'soft'}" data-act="tts">${S.settings.tts?'🔊 Voz activada':'🔇 Voz apagada'}</button></div>`;
+  h+=`<div class="row" style="justify-content:flex-end;margin:-8px 0 10px;gap:8px"><button class="btn sm soft" data-act="memo">🧠 Memoria (${(S.memo||[]).length})</button><button class="btn sm ${S.settings.tts?'':'soft'}" data-act="tts">${S.settings.tts?'🔊 Voz activada':'🔇 Voz apagada'}</button></div>`;
   h+=`<div class="card">${ms.length?ms.map(m=>`<div class="msg ${m.role==='user'?'u':'a'}">${esc(m.content)}${m.acts&&m.acts.length?`<div style="margin-top:8px">${m.acts.map(x=>`<span class="tag l" style="margin:2px 4px 0 0">✓ ${esc(x)}</span>`).join('')}</div>`:''}</div>`).join(''):`<div class="msg a">¡Hola${S.settings.name?', '+esc(S.settings.name):''}! 💕 Soy Valeria. Pregúntame lo que quieras o pídeme cosas: apunto tus medidas, te creo rutinas, cambio tu reto, te hago un plan de entreno… Yo me encargo.</div>`}${aiBusy?'<div class="msg a t" id="streamMsg">Pensando…</div>':''}</div>
   ${aiBusy?'':`<div class="chips">${QUICK.map(q=>`<button class="chip" data-act="aiQuick" data-q="${esc(q)}">${esc(q)}</button>`).join('')}</div>`}
   <div class="row" style="align-items:flex-end"><textarea id="aiIn" style="min-height:52px;height:52px" placeholder="Pídeme lo que quieras…"></textarea><button class="btn" data-act="aiSend" ${aiBusy?'disabled':''}>➤</button></div>
@@ -674,7 +722,7 @@ function vAjustes(){
   h+=`<div class="card"><h2>Secciones</h2><p class="small mute" style="margin:0 0 6px">Enciende solo lo que te sirva ahora. Puedes activar el resto cuando quieras; no se borra nada.</p>${SECS.map(s=>`<div class="li"><span style="font-size:20px">${s[1]}</span><div class="grow">${s[2]}</div><button class="sw ${secOn(s[0])?'on':''}" data-act="togSec" data-k="${s[0]}"></button></div>`).join('')}</div>`;
   h+=`<div class="card"><h2>Inteligencia artificial</h2><p class="small mute" style="margin:0 0 6px">Con una clave de <b>OpenRouter</b> (gratis, con límite de unas 50 peticiones al día) Lumi te escribe un mensaje distinto cada día, inventa retos nuevos y tienes a Valeria para preguntarle dentro de la app.</p>
   <label class="f">Clave de API</label><input id="aiKey" type="password" autocomplete="off" placeholder="sk-or-…" value="${esc(S.settings.aiKey||'')}">
-  <label class="f">Modelo</label><input id="aiModel" placeholder="openrouter/free" value="${esc(S.settings.aiModel||'')}">
+  <label class="f">Modelo</label><div class="row"><input id="aiModel" placeholder="Automático (openrouter/free)" value="${esc(S.settings.aiModel||'')}"><button class="btn sm ghost" style="flex:none" data-act="pickModel">📋 Elegir de la lista</button></div>
   <p class="small mute">Déjalo vacío para usar los modelos gratuitos. Lo que mandes a la IA sale del móvil hacia OpenRouter; el resto de Lumi sigue siendo local. La clave se guarda solo aquí y no va en las copias de seguridad.</p>
   <div class="row"><button class="btn block" data-act="saveAI">Guardar y probar</button>${S.settings.aiKey?'<button class="btn soft" data-act="delAI">Quitar</button>':''}</div></div>`;
   h+=`<div class="card"><h2>Chatbot</h2><div class="li"><span style="font-size:20px">💬</span><div class="grow"><b>${S.settings.botUrl?esc(S.settings.botUrl.replace(/^https?:\/\//,'')):'Sin configurar'}</b><div class="mute small">Acceso directo desde Más</div></div><button class="btn sm" data-act="setBot">${S.settings.botUrl?'Cambiar':'Poner'}</button></div></div>`;
@@ -785,7 +833,7 @@ const ACT={
   delAI:()=>{S.settings.aiKey='';S.aiTip=null;save();render()},
   eday:el=>{eday=+el.dataset.d;render()},
   exDone:el=>{const t=ymd();S.planLog=S.planLog||{};const a=S.planLog[t]||(S.planLog[t]=[]),k=exKey(eday,+el.dataset.i),x=a.indexOf(k);x<0?a.push(k):a.splice(x,1);
-    const D=plan().days[eday];if(D.ex.every((e,i)=>a.includes(exKey(eday,i)))){const r=(S.routines.find(r=>/glúteo|entreno/i.test(r.name)&&r.freq!=='semanal')||S.routines.find(r=>/ejercicio/i.test(r.name)&&!/voz/i.test(r.name)&&r.freq!=='semanal'));if(r){const c=S.checks[t]||(S.checks[t]=[]);if(!c.includes(r.id))c.push(r.id)}toast('¡Día completado! 💪')}
+    const D=plan().days[eday];if(D.ex.every((e,i)=>a.includes(exKey(eday,i)))){const r=(S.routines.find(r=>/glúteo|entreno/i.test(r.name)&&r.freq!=='semanal')||S.routines.find(r=>/ejercicio/i.test(r.name)&&!/voz/i.test(r.name)&&r.freq!=='semanal'));if(r){const c=S.checks[t]||(S.checks[t]=[]);if(!c.includes(r.id))c.push(r.id)}if(S.planDoneDate!==t){S.planDone=(S.planDone||0)+1;S.planDoneDate=t}toast('¡Día completado! 💪')}
     save();render()},
   planReset:()=>{if(!confirm('¿Volver al plan básico? Se borrará el plan de la IA.'))return;S.plan=null;S.planManual=true;eday=0;if(S.planLog)S.planLog[ymd()]=[];save();render()},
   planAI:()=>{sheet(`<h3>Plan a tu medida ✨</h3>
@@ -819,6 +867,24 @@ const ACT={
       if(m&&m[1]!==APP_V){toast('Nueva versión '+m[1]+', actualizando…');try{await fetch(location.href,{cache:'reload'})}catch(e){}setTimeout(()=>location.reload(),900);return}
       toast('Ya tienes la última versión ✓')}catch(e){toast('Sin conexión, prueba más tarde')}
     el.textContent='Buscar actualización';el.disabled=false},
+  goEnt:el=>{eday=+el.dataset.d;go('entreno')},
+  showDone:()=>{showDone=!showDone;render()},
+  weekly:()=>loadWeekly(true),
+  memo:()=>{const m=S.memo||[];sheet(`<h3>🧠 Lo que Valeria sabe de ti</h3><p class="small mute" style="margin-top:-4px">Lo apunta ella sola cuando le cuentas algo importante. Se guarda solo en tu móvil.</p>
+    <div class="card">${m.length?m.map((x,i)=>`<div class="li"><div class="grow small">${esc(x)}</div><button class="x" data-act="memDel" data-i="${i}">✕</button></div>`).join(''):'<div class="empty">Todavía nada. Cuéntale cosas como tu tipo de piel o tus tallas.</div>'}</div>
+    <label class="f">Añadir algo a mano</label><div class="row"><input id="memIn" placeholder="Ej: tengo la piel mixta"><button class="btn" data-act="memAdd">＋</button></div>
+    <div class="actions"><button class="btn soft" data-act="close">Cerrar</button></div>`)},
+  memDel:el=>{S.memo.splice(+el.dataset.i,1);save();ACT.memo();render()},
+  memAdd:()=>{const v=fv('memIn');if(!v)return;S.memo=S.memo||[];S.memo.push(v.slice(0,160));save();ACT.memo();render()},
+  pickModel:async el=>{el.textContent='Cargando…';el.disabled=true;
+    try{const r=await fetch('https://openrouter.ai/api/v1/models');const j=await r.json();
+      const fr=(j.data||[]).filter(m=>/:free$/.test(m.id)||(m.pricing&&+m.pricing.prompt===0&&+m.pricing.completion===0)).sort((a,b)=>(b.context_length||0)-(a.context_length||0));
+      sheet(`<h3>Elegir modelo gratuito</h3><p class="small mute" style="margin-top:-4px">"Automático" va cambiando entre todos los gratuitos y reintenta solo si uno falla o va lento. Si eliges uno fijo y un día deja de ser gratis, vuelve aquí.</p>
+        <button class="chk ${!S.settings.aiModel?'sel':''}" data-act="setModel" data-m=""><span class="ic">✨</span><span class="tx"><b>Automático (recomendado)</b></span></button>
+        ${fr.map(m=>`<button class="chk ${S.settings.aiModel===m.id?'sel':''}" data-act="setModel" data-m="${esc(m.id)}"><span class="ic">🤖</span><span class="tx"><b>${esc(m.name||m.id)}</b><small>${esc(m.id)}</small></span></button>`).join('')||'<div class="empty">No se ha podido cargar la lista.</div>'}
+        <div class="actions"><button class="btn soft" data-act="close">Cerrar</button></div>`)}
+    catch(e){toast('No se pudo cargar la lista');el.textContent='📋 Elegir de la lista';el.disabled=false}},
+  setModel:el=>{S.settings.aiModel=el.dataset.m;S.aiTip=S.aiTip;save();closeSheet();render();toast(el.dataset.m?'Modelo: '+el.dataset.m:'Modelo automático ✨')},
   setTheme:el=>{S.settings.theme=el.dataset.t;save();render()},
   sugName:el=>{const box=document.getElementById(el.dataset.box);const pick=[...NAMES].sort(()=>Math.random()-.5).slice(0,8);
     box.innerHTML=pick.map(n=>`<button class="chip" data-act="useName" data-n="${n}" data-in="${el.dataset.in}">${n}</button>`).join('');el.textContent='🎲 Otros nombres'},
