@@ -215,7 +215,7 @@ const STAGES=[null,
 const STAGE_GOAL=8;
 const NAMES=['Lucía','Valentina','Sofía','Martina','Julia','Paula','Alba','Carla','Daniela','Elena','Irene','Claudia','Laura','Marina','Noa','Vera','Abril','Olivia','Emma','Alma','Lola','Candela','Inés','Andrea','Sara','Nerea','Ariadna','Bianca','Chloe','Gala','Mía','Zoe','Aitana','Luna','Celia','Adriana','Natalia','Victoria','Alexia','Jessica','Vanessa','Sandra','Mónica','Cristina','Raquel','Silvia','Patricia','Verónica','Ainhoa','Lorena','Miriam','Estela','Jimena','Valeria','Estefanía','Rebeca','Diana','Nadia','Tamara','Yolanda'];
 const nameUI=(inId)=>`<div class="chips" id="nb_${inId}" style="margin:10px 0 0"></div><button class="btn sm ghost" style="margin-top:8px" data-act="sugName" data-box="nb_${inId}" data-in="${inId}">✨ Sugiéreme un nombre</button>`;
-const SECS=[['diario','📔','Diario y medidas'],['voz','🎤','Voz'],['armario','👗','Armario'],['salud','💊','Salud'],['intimo','🔒','Íntimo']];
+const SECS=[['diario','📔','Diario y medidas'],['voz','🎤','Voz'],['entreno','🏋️','Entreno'],['armario','👗','Armario'],['salud','💊','Salud'],['intimo','🔒','Íntimo']];
 const secOn=k=>S.sec[k]!==false;
 function stageDone(){return S.retosLog.filter(l=>l.stage===S.stage).length}
 let storageOK=true;
@@ -291,6 +291,46 @@ async function loadTip(){
     if(t){S.aiTip={date:ymd(),text:t};save();if(view==='hoy')render()}}catch(e){}
   tipLoading=false;
 }
+/* ================= Entreno ================= */
+const PLAN0={title:'Plan básico en casa',ai:false,days:[
+  {name:'Glúteos y cadera',ex:[
+    {n:'Puente de glúteos',s:3,r:'15',t:'Aprieta glúteos arriba 2 segundos; no arquees la espalda.'},
+    {n:'Patada de glúteo a cuatro patas',s:3,r:'12 por pierna',t:'Pierna doblada, empuja el talón hacia el techo.'},
+    {n:'Abducción tumbada de lado',s:3,r:'15 por pierna',t:'Sube la pierna recta sin girar la cadera.'},
+    {n:'Almeja (clamshell)',s:3,r:'15 por pierna',t:'Rodillas dobladas, abre como una concha. Con goma, mejor.'},
+    {n:'Sentadilla sumo',s:3,r:'12',t:'Piernas abiertas, puntas hacia fuera, baja lento.'}]},
+  {name:'Cintura y postura',ex:[
+    {n:'Vacío abdominal',s:4,r:'20 s',t:'Suelta el aire y mete el ombligo hacia dentro. Mejor en ayunas.'},
+    {n:'Plancha',s:3,r:'30 s',t:'Cuerpo recto, abdomen apretado, sin hundir la cadera.'},
+    {n:'Dead bug',s:3,r:'10',t:'Espalda pegada al suelo, mueve brazo y pierna contrarios.'},
+    {n:'Bird dog',s:3,r:'10 por lado',t:'A cuatro patas, estira brazo y pierna contrarios sin girar.'},
+    {n:'Estiramiento de pecho en pared',s:2,r:'30 s por lado',t:'Abre el pecho y lleva los hombros atrás: mejora la postura.'}]},
+  {name:'Piernas y flexibilidad',ex:[
+    {n:'Zancada hacia atrás',s:3,r:'10 por pierna',t:'Rodilla delantera sin pasar la punta del pie.'},
+    {n:'Hip thrust apoyada en el sofá',s:3,r:'12',t:'Espalda en el sofá, empuja con los talones.'},
+    {n:'Puente a una pierna',s:3,r:'10 por pierna',t:'Cadera recta, sin que caiga hacia un lado.'},
+    {n:'Sentadilla búlgara',s:3,r:'8 por pierna',t:'Pie de atrás en una silla, baja recta.'},
+    {n:'Mariposa y estiramiento de cadera',s:2,r:'45 s',t:'Plantas juntas, deja caer las rodillas sin forzar.'}]}
+]};
+let eday=0;
+const plan=()=>S.plan||PLAN0;
+const exKey=(d,i)=>d+'-'+i;
+function vEntreno(){
+  const P=plan(),t=ymd();if(eday>=P.days.length)eday=0;const D=P.days[eday],done=(S.planLog&&S.planLog[t])||[];
+  let h=head('Entreno','Tu cuerpo');
+  h+=`<div class="card"><h2>${esc(P.title)}${P.ai?' · ✨ IA':''}</h2><div class="row wrap">${hasAI()?'<button class="btn sm" data-act="planAI">✨ Nuevo plan con IA</button>':'<span class="small mute">Con la IA activada en Ajustes puedes pedir un plan a tu medida.</span>'}${S.plan?'<button class="btn sm soft" data-act="planReset">Plan básico</button>':''}</div>${P.note?`<p class="small mute" style="margin:10px 0 0">${esc(P.note)}</p>`:''}</div>`;
+  h+=`<div class="chips">${P.days.map((d,i)=>`<button class="chip ${i===eday?'on':''}" data-act="eday" data-d="${i}">Día ${i+1}</button>`).join('')}</div>`;
+  const n=D.ex.filter((e,i)=>done.includes(exKey(eday,i))).length;
+  h+=`<div class="card"><h2>${esc(D.name)} <span>${n}/${D.ex.length} hoy</span></h2>${D.ex.map((e,i)=>{const ok=done.includes(exKey(eday,i));return `<button class="chk ${ok?'on':''}" data-act="exDone" data-i="${i}"><span class="ic">🏋️</span><span class="tx">${esc(e.n)}<small>${esc(e.s)} × ${esc(e.r)}${e.t?' · '+esc(e.t):''}</small></span><span class="tick">${ok?'✓':''}</span></button>`}).join('')}</div>`;
+  h+=`<p class="small mute" style="text-align:center">Calienta 5 minutos antes y para si algo te duele. Mejor 2–4 días por semana con descanso entre medias.</p>`;
+  return h;
+}
+function parsePlan(txt){
+  const m=txt.match(/\{[\s\S]*\}/);if(!m)return null;let j;try{j=JSON.parse(m[0])}catch(e){return null}
+  if(!j||!Array.isArray(j.days)||!j.days.length)return null;
+  const days=j.days.slice(0,6).map(d=>({name:String(d.name||'Día'),ex:(Array.isArray(d.ex)?d.ex:[]).slice(0,8).map(e=>({n:String(e.n||e.name||''),s:String(e.s||e.series||3),r:String(e.r||e.reps||''),t:String(e.t||e.tip||'')})).filter(e=>e.n)})).filter(d=>d.ex.length);
+  return days.length?{title:String(j.title||'Mi plan'),note:String(j.note||''),days,ai:true}:null;
+}
 function retoPool(){const st=STAGES[S.stage];return [...(st?st.r:[]),...S.retos]}
 function retoHoy(){const t=ymd(),pool=retoPool();if(!pool.length)return null;
   if(!S.retoPick||S.retoPick.date!==t||!S.retoPick.text||S.retoPick.stage!==S.stage){
@@ -300,8 +340,8 @@ function retoHoy(){const t=ymd(),pool=retoPool();if(!pool.length)return null;
 
 /* ================= Vistas ================= */
 let view='hoy',dseg='entradas',metric='cintura',wf='todo',ilvl=0,drawn=null;
-const VIEWS={hoy:vHoy,diario:vDiario,rutinas:vRutinas,voz:vVoz,mas:vMas,armario:vArmario,salud:vSalud,intimo:vIntimo,retos:vRetos,chat:vChat,ia:vIA,ajustes:vAjustes};
-const MAS=['armario','salud','intimo','retos','ajustes','chat','ia'];
+const VIEWS={hoy:vHoy,diario:vDiario,rutinas:vRutinas,voz:vVoz,mas:vMas,armario:vArmario,salud:vSalud,intimo:vIntimo,retos:vRetos,chat:vChat,ia:vIA,entreno:vEntreno,ajustes:vAjustes};
+const MAS=['armario','salud','intimo','retos','ajustes','chat','ia','entreno'];
 function go(v){if(v!==view)stopMic();view=v;drawn=null;render();window.scrollTo(0,0)}
 function applyTheme(){const t=S.settings.theme||'dark';const dark=t==='dark'||(t==='auto'&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches);
   document.documentElement.classList.toggle('dark',dark);const m=document.querySelector('meta[name=theme-color]');if(m)m.content=dark?'#17101a':'#fbf5f3'}
@@ -405,7 +445,7 @@ function vVoz(){
 
 function vMas(){
   let h=head('Más','Todo lo tuyo');
-  const T=[['armario','👗','Armario',`${S.wardrobe.length} prendas`],['salud','💊','Salud','Medicación y citas'],['intimo','🔒','Íntimo',`${S.intimate.length} tareas`],['retos','🌟','Retos',`${S.retosLog.length} conseguidos`],['ajustes','⚙️','Ajustes','Etapa, secciones, PIN']].filter(t=>!SECS.some(s=>s[0]===t[0])||secOn(t[0]));
+  const T=[['entreno','🏋️','Entreno',`${plan().days.length} días · ${plan().ai?'plan IA':'plan básico'}`],['armario','👗','Armario',`${S.wardrobe.length} prendas`],['salud','💊','Salud','Medicación y citas'],['intimo','🔒','Íntimo',`${S.intimate.length} tareas`],['retos','🌟','Retos',`${S.retosLog.length} conseguidos`],['ajustes','⚙️','Ajustes','Etapa, secciones, PIN']].filter(t=>!SECS.some(s=>s[0]===t[0])||secOn(t[0]));
   const bot=S.settings.botUrl;
   h+=`<div class="tiles"><button class="tile" data-act="go" data-v="ia"><div class="e">✨</div><b>Valeria IA</b><span>${hasAI()?'Chat dentro de Lumi':'Configurar IA'}</span></button>${bot?`<a class="tile" href="${esc(bot)}" target="_blank" rel="noopener noreferrer" style="text-decoration:none"><div class="e">💬</div><b>Chatbot</b><span>Hablar con tu asistente ↗</span></a>`:`<button class="tile" data-act="setBot"><div class="e">💬</div><b>Chatbot</b><span>Configurar</span></button>`}${T.map(t=>`<button class="tile" data-act="go" data-v="${t[0]}"><div class="e">${t[1]}</div><b>${t[2]}</b><span>${t[3]}</span></button>`).join('')}</div>`;
   return h;
@@ -584,6 +624,28 @@ const ACT={
   saveAI:async el=>{const k=fv('aiKey');if(!k)return toast('Pega tu clave');S.settings.aiKey=k;S.settings.aiModel=fv('aiModel');S.aiTip=null;save();el.textContent='Probando…';el.disabled=true;
     try{const t=await ai([{role:'user',content:'Responde solo con la palabra: OK'}],20,0);toast(t?'¡Conectada y respondiendo! ✨':'Clave válida ✓ (el modelo no respondió, prueba en el chat)')}catch(e){toast('⚠️ '+e.message)}render()},
   delAI:()=>{S.settings.aiKey='';S.aiTip=null;save();render()},
+  eday:el=>{eday=+el.dataset.d;render()},
+  exDone:el=>{const t=ymd();S.planLog=S.planLog||{};const a=S.planLog[t]||(S.planLog[t]=[]),k=exKey(eday,+el.dataset.i),x=a.indexOf(k);x<0?a.push(k):a.splice(x,1);
+    const D=plan().days[eday];if(D.ex.every((e,i)=>a.includes(exKey(eday,i)))){const r=(S.routines.find(r=>/glúteo|entreno/i.test(r.name)&&r.freq!=='semanal')||S.routines.find(r=>/ejercicio/i.test(r.name)&&!/voz/i.test(r.name)&&r.freq!=='semanal'));if(r){const c=S.checks[t]||(S.checks[t]=[]);if(!c.includes(r.id))c.push(r.id)}toast('¡Día completado! 💪')}
+    save();render()},
+  planReset:()=>{if(!confirm('¿Volver al plan básico? Se borrará el plan de la IA.'))return;S.plan=null;eday=0;if(S.planLog)S.planLog[ymd()]=[];save();render()},
+  planAI:()=>{sheet(`<h3>Plan a tu medida ✨</h3>
+    <label class="f">Días por semana</label><select id="pDays"><option>2</option><option selected>3</option><option>4</option><option>5</option></select>
+    <label class="f">Dónde entrenas</label><select id="pWhere"><option>En casa sin material</option><option>En casa con gomas o mancuernas</option><option>En el gimnasio</option></select>
+    <label class="f">Nivel</label><select id="pLvl"><option>Principiante</option><option>Intermedio</option><option>Avanzado</option></select>
+    <label class="f">¿Qué quieres trabajar?</label><div class="chips" id="pGoals">${['Glúteos','Caderas','Cintura','Piernas','Postura','Flexibilidad','Brazos definidos'].map((g,i)=>`<button class="chip ${i<3?'on':''}" data-act="pGoal">${g}</button>`).join('')}</div>
+    <label class="f">Algo más (opcional)</label><input id="pNote" placeholder="Ej: tengo poco tiempo, me molesta la rodilla…">
+    <div class="actions"><button class="btn soft" data-act="close">Cancelar</button><button class="btn" data-act="planGo">Crear plan</button></div>`)},
+  pGoal:el=>el.classList.toggle('on'),
+  planGo:async el=>{if(el.disabled)return;const goals=[...document.querySelectorAll('#pGoals .on')].map(b=>b.textContent).join(', ')||'cuerpo femenino en general';
+    const q=`Crea un plan de entrenamiento para feminizar la silueta: ${fv('pDays')} días por semana, ${fv('pWhere').toLowerCase()}, nivel ${fv('pLvl').toLowerCase()}. Objetivos: ${goals}. ${fv('pNote')?'Notas: '+fv('pNote')+'.':''}
+Prioriza glúteos y caderas, cintura estrecha (evita trabajo pesado de oblicuos y de espalda ancha), postura y flexibilidad. 4 a 6 ejercicios por día. Responde SOLO con JSON válido, sin texto antes ni después, con este formato exacto:
+{"title":"nombre corto del plan","note":"un consejo general breve","days":[{"name":"enfoque del día","ex":[{"n":"nombre del ejercicio","s":3,"r":"12 o 30 s","t":"consejo de técnica breve"}]}]}`;
+    el.disabled=true;el.textContent='Creando…';
+    try{const t=await ai([{role:'system',content:'Eres una entrenadora personal experta en entrenamiento para mujeres trans y personas que feminizan su cuerpo. Respondes en español de España y solo con JSON válido cuando se te pide.'},{role:'user',content:q}],3000,.7);
+      const p=parsePlan(t);if(!p)throw new Error('La IA no ha devuelto un plan válido, prueba otra vez');
+      S.plan=p;eday=0;if(S.planLog)S.planLog[ymd()]=[];save();closeSheet();go('entreno');toast('¡Plan nuevo listo! 💪')}
+    catch(e){toast(e.message||'No se pudo conectar');el.disabled=false;el.textContent='Crear plan'}},
   setTheme:el=>{S.settings.theme=el.dataset.t;save();render()},
   sugName:el=>{const box=document.getElementById(el.dataset.box);const pick=[...NAMES].sort(()=>Math.random()-.5).slice(0,8);
     box.innerHTML=pick.map(n=>`<button class="chip" data-act="useName" data-n="${n}" data-in="${el.dataset.in}">${n}</button>`).join('');el.textContent='🎲 Otros nombres'},
