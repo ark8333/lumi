@@ -282,8 +282,62 @@ function aiCtx(){
   `Rutinas: ${S.routines.map(r=>r.name).join(', ')}. Hoy ha hecho: ${S.routines.filter(isDone).map(r=>r.name).join(', ')||'nada aún'}. `+
   `Retos conseguidos recientemente: ${S.retosLog.slice(-8).map(l=>l.text).join(' | ')||'ninguno'}. `+
   `${S.wardrobe.length?'Tiene '+S.wardrobe.filter(w=>w.status!=='quiero').length+' prendas y '+S.wardrobe.filter(w=>w.status==='quiero').length+' en su lista de deseos. ':'Aún no tiene ropa femenina. '}`+
-  `${last?'Última entrada del diario ('+last.date+'): '+(last.mood||'')+' '+(last.text||'').slice(0,200):''}`;
+  `${last?'Última entrada del diario ('+last.date+'): '+(last.mood||'')+' '+(last.text||'').slice(0,200)+'. ':''}`+
+  `Hoy es ${ymd()} (${fmtLong(new Date())}). Reto de hoy: ${S.retoPick&&S.retoPick.date===ymd()?S.retoPick.text+(S.retoPick.done?' (ya hecho)':' (pendiente)'):'ninguno'}. `+
+  `Plan de entreno: ${plan().title}: ${plan().days.map((d,i)=>'Día '+(i+1)+' '+d.name).join(', ')}. `+
+  `Minutos de voz esta semana: ${S.voiceLog.filter(l=>l.date>=weekStart()).reduce((a,l)=>a+l.mins,0)}. `+
+  `Próximas citas: ${S.appts.filter(a=>a.date>=ymd()).map(a=>a.date+' '+a.text).join(' | ')||'ninguna'}. `+
+  `Últimas medidas: ${(()=>{const m=[...S.measures].sort((a,b)=>a.date<b.date?1:-1)[0];return m?MF.filter(f=>m[f[0]]).map(f=>f[1]+' '+m[f[0]]+f[2]).join(', '):'ninguna'})()}.`;
 }
+const ACT_SYS=`Eres como Jarvis para la app Lumi: además de responder, puedes MANEJAR la app. Cuando la usuaria te pida hacer, apuntar, crear, cambiar o marcar algo, hazlo añadiendo AL FINAL de tu respuesta un bloque exactamente así:
+<acciones>[{"tipo":"...", ...}]</acciones>
+Tipos disponibles (usa solo estos):
+- {"tipo":"ir","seccion":"hoy|diario|rutinas|voz|entreno|armario|salud|retos|ajustes"}
+- {"tipo":"rutina_nueva","nombre":"texto","icono":"un emoji","frecuencia":"diaria|semanal"}
+- {"tipo":"rutina_hecha","nombre":"nombre de una rutina existente"}
+- {"tipo":"rutina_borrar","nombre":"nombre de una rutina existente"}
+- {"tipo":"reto_hoy","texto":"reto para hoy"}
+- {"tipo":"reto_hecho"}
+- {"tipo":"reto_nuevo","texto":"reto para su lista"}
+- {"tipo":"diario","texto":"entrada","animo":"un emoji"}
+- {"tipo":"medidas","peso":0,"pecho":0,"bajo":0,"cintura":0,"cadera":0} (pon solo las que ella diga, en kg y cm)
+- {"tipo":"armario","nombre":"texto","categoria":"Vestido|Falda|Top / blusa|Pantalón|Lencería|Medias|Zapatos|Accesorio|Maquillaje|Peluca|Cuidado de piel|Otro","estado":"tengo|quiero","talla":"texto"}
+- {"tipo":"cita","fecha":"AAAA-MM-DD","texto":"texto"}
+- {"tipo":"ejercicio_voz","nombre":"texto","minutos":5,"consejo":"texto"}
+- {"tipo":"plan_entreno","title":"texto","note":"texto","days":[{"name":"texto","ex":[{"n":"ejercicio","s":3,"r":"12","t":"consejo"}]}]}
+- {"tipo":"etapa","numero":1}
+Reglas: usa solo datos que ella te dé (no inventes medidas ni fechas); si solo pregunta algo, no pongas el bloque; puedes poner varias acciones; di en una frase corta lo que has hecho. Nunca menciones el bloque ni su formato.`;
+const findR=n=>{n=String(n||'').toLowerCase();return S.routines.find(r=>r.name.toLowerCase()===n)||S.routines.find(r=>r.name.toLowerCase().includes(n)||n.includes(r.name.toLowerCase()))};
+function runActs(list){const out=[];if(!Array.isArray(list))return out;const t=ymd();
+  for(const a of list.slice(0,10)){try{switch(a.tipo){
+    case 'ir':if(VIEWS[a.seccion]){setTimeout(()=>go(a.seccion),900);out.push('Abriendo '+a.seccion)}break;
+    case 'rutina_nueva':if(a.nombre){S.routines.push({id:uid(),icon:a.icono||'✨',name:String(a.nombre),freq:a.frecuencia==='semanal'?'semanal':'diaria'});out.push('Rutina añadida: '+a.nombre)}break;
+    case 'rutina_hecha':{const r=findR(a.nombre);if(r&&!isDone(r)){(S.checks[t]||(S.checks[t]=[])).push(r.id);out.push('Hecha: '+r.name)}break}
+    case 'rutina_borrar':{const r=findR(a.nombre);if(r){S.routines=S.routines.filter(x=>x!==r);out.push('Rutina quitada: '+r.name)}break}
+    case 'reto_hoy':if(a.texto){S.retoPick={date:t,text:String(a.texto),done:false,stage:S.stage,ai:true};out.push('Reto de hoy cambiado')}break;
+    case 'reto_hecho':{const rp=retoHoy();if(rp&&!rp.done){rp.done=true;S.retosLog.push({date:t,text:rp.text,stage:S.stage});out.push('Reto conseguido 🌟')}break}
+    case 'reto_nuevo':if(a.texto){S.retos.push(String(a.texto));out.push('Reto guardado en tu lista')}break;
+    case 'diario':if(a.texto){S.journal.push({id:uid(),ts:Date.now(),date:t,mood:a.animo||'',text:String(a.texto),photo:''});out.push('Apuntado en el diario')}break;
+    case 'medidas':{const m={id:uid(),date:t};let any=false;MF.forEach(f=>{const v=parseFloat(a[f[0]]);if(v>0){m[f[0]]=v;any=true}});if(any){S.measures.push(m);out.push('Medidas guardadas')}break}
+    case 'armario':if(a.nombre){S.wardrobe.unshift({id:uid(),name:String(a.nombre),type:WTYPES.includes(a.categoria)?a.categoria:'Otro',status:a.estado==='tengo'?'tengo':'quiero',size:a.talla||'',price:'',note:'',photo:''});out.push('Añadido al armario: '+a.nombre)}break;
+    case 'cita':if(a.texto&&/^\d{4}-\d{2}-\d{2}$/.test(a.fecha||'')){S.appts.push({id:uid(),date:a.fecha,text:String(a.texto)});out.push('Cita apuntada: '+fmt(a.fecha))}break;
+    case 'ejercicio_voz':if(a.nombre){S.voiceEx.push({id:uid(),name:String(a.nombre),mins:Math.max(1,parseInt(a.minutos)||5),tip:a.consejo||''});out.push('Ejercicio de voz añadido')}break;
+    case 'plan_entreno':{const p=parsePlan(JSON.stringify(a));if(p){p.date=t;S.plan=p;S.planManual=false;eday=0;if(S.planLog)S.planLog[t]=[];out.push('Plan de entreno nuevo')}break}
+    case 'etapa':{const n=parseInt(a.numero);if(n>=1&&n<=4){S.stage=n;S.retoPick=null;out.push('Etapa: '+STAGES[n].n)}break}
+  }}catch(e){}}
+  if(out.length)save();return out}
+function splitActs(t){let acts=[];const m=t.match(/<acciones>([\s\S]*?)<\/acciones>/i);
+  if(m){try{const j=JSON.parse(m[1].trim().replace(/^```(json)?|```$/g,''));acts=Array.isArray(j)?j:[j]}catch(e){}}
+  return {text:t.replace(/<acciones>[\s\S]*?(<\/acciones>|$)/ig,'').trim(),acts}}
+function speak(t){try{if(!S.settings.tts||!window.speechSynthesis)return;speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t.replace(/[*#_`>]/g,'').slice(0,600));u.lang='es-ES';
+  const v=speechSynthesis.getVoices().filter(v=>/^es/i.test(v.lang));const f=v.find(v=>/female|mujer|helena|elvira|lucia|monica|paulina|laura/i.test(v.name))||v[0];if(f)u.voice=f;u.rate=1.02;speechSynthesis.speak(u)}catch(e){}}
+let retoAuto=false,planAuto=false;
+async function autoReto(){const rp=S.retoPick;if(!hasAI()||retoAuto||!rp||rp.ai||rp.done||rp.date!==ymd())return;retoAuto=true;
+  try{const hechos=S.retosLog.slice(-15).map(l=>l.text).join(' | ');
+    const t=await ai([{role:'system',content:AI_SYS},{role:'user',content:aiCtx()+`\n\nInventa UN reto nuevo para hoy, adecuado a su etapa, concreto y que pueda hacer hoy a su ritmo. Distinto de estos: ${hechos||'(ninguno)'}. Máximo 20 palabras. Responde solo con el texto del reto, sin comillas.`}],120,1);
+    const txt=(t.split('\n').map(x=>x.trim()).filter(Boolean)[0]||'').replace(/^["“'*\-\s]+|["”'*\s]+$/g,'');
+    if(txt&&S.retoPick===rp&&!rp.done){S.retoPick={...rp,text:txt,ai:true};save();if(view==='hoy')render()}}catch(e){}
+  retoAuto=false}
 const AI_SYS='Eres Valeria, asistente experta en feminización, imagen y cuidado personal: tallas, ropa y estilo según el cuerpo, maquillaje, cuidado de piel, depilación, voz, postura, pelo y pelucas. Hablas en español de España, cercana, clara y práctica, con explicaciones paso a paso y productos concretos con alternativas baratas. Nunca juzgas. Usas siempre el femenino con la usuaria. Adaptas los consejos a su etapa y nunca la empujas a algo de una etapa a la que no ha llegado. Sobre hormonas o tratamientos médicos das solo información general y nunca dosis: remites siempre a un endocrino o a la unidad de identidad de género. Respuestas breves salvo que pida detalle.';
 async function loadTip(){
   if(!hasAI()||tipLoading||(S.aiTip&&S.aiTip.date===ymd()))return;tipLoading=true;
@@ -315,7 +369,20 @@ const PLAN0={title:'Plan básico en casa',ai:false,days:[
 let eday=0;
 const plan=()=>S.plan||PLAN0;
 const exKey=(d,i)=>d+'-'+i;
+const PREFS0={days:'3',where:'En casa sin material',lvl:'Principiante',goals:'Glúteos, Caderas, Cintura',note:''};
+async function genPlan(pr){
+  const q=`Crea un plan de entrenamiento para feminizar la silueta: ${pr.days} días por semana, ${pr.where.toLowerCase()}, nivel ${pr.lvl.toLowerCase()}. Objetivos: ${pr.goals}. ${pr.note?'Notas: '+pr.note+'.':''}
+Prioriza glúteos y caderas, cintura estrecha (evita trabajo pesado de oblicuos y de espalda ancha), postura y flexibilidad. 4 a 6 ejercicios por día. ${S.plan&&S.plan.ai?'Que sea distinto al plan anterior ('+S.plan.title+').':''} Responde SOLO con JSON válido, sin texto antes ni después, con este formato exacto:
+{"title":"nombre corto del plan","note":"un consejo general breve","days":[{"name":"enfoque del día","ex":[{"n":"nombre del ejercicio","s":3,"r":"12 o 30 s","t":"consejo de técnica breve"}]}]}`;
+  const t=await ai([{role:'system',content:'Eres una entrenadora personal experta en entrenamiento para mujeres trans y personas que feminizan su cuerpo. Respondes en español de España y solo con JSON válido cuando se te pide.'},{role:'user',content:q}],3000,.7);
+  const p=parsePlan(t);if(!p)throw new Error('La IA no ha devuelto un plan válido, prueba otra vez');
+  p.date=ymd();S.plan=p;S.planManual=false;eday=0;if(S.planLog)S.planLog[ymd()]=[];save();return p}
+function planDue(){if(!hasAI()||S.planManual)return false;if(!S.plan||!S.plan.ai)return true;if(!S.plan.date){S.plan.date=ymd();save();return false}
+  return (dt(ymd())-dt(S.plan.date))/864e5>=7}
+async function autoPlan(){if(planAuto)return;planAuto=true;try{await genPlan(S.planPrefs||PREFS0);toast('Plan de la semana listo 💪')}catch(e){toast(e.message||'No se pudo crear el plan')}planAuto=false;if(view==='entreno')render()}
 function vEntreno(){
+  if(planDue()&&!planAuto)setTimeout(autoPlan,50);
+  if(planAuto||(planDue()&&hasAI()))return head('Entreno','Tu cuerpo')+'<div class="card"><div style="font:500 20px var(--serif)">✨ Valeria está preparando tu plan de la semana…</div><p class="small mute">Tarda unos segundos.</p></div>';
   const P=plan(),t=ymd();if(eday>=P.days.length)eday=0;const D=P.days[eday],done=(S.planLog&&S.planLog[t])||[];
   let h=head('Entreno','Tu cuerpo');
   h+=`<div class="card"><h2>${esc(P.title)}${P.ai?' · ✨ IA':''}</h2><div class="row wrap">${hasAI()?'<button class="btn sm" data-act="planAI">✨ Nuevo plan con IA</button>':'<span class="small mute">Con la IA activada en Ajustes puedes pedir un plan a tu medida.</span>'}${S.plan?'<button class="btn sm soft" data-act="planReset">Plan básico</button>':''}</div>${P.note?`<p class="small mute" style="margin:10px 0 0">${esc(P.note)}</p>`:''}</div>`;
@@ -336,6 +403,7 @@ function retoHoy(){const t=ymd(),pool=retoPool();if(!pool.length)return null;
   if(!S.retoPick||S.retoPick.date!==t||!S.retoPick.text||S.retoPick.stage!==S.stage){
     const hechos=S.retosLog.map(l=>l.text);const nuevos=pool.filter(r=>!hechos.includes(r));const p=nuevos.length?nuevos:pool;
     S.retoPick={date:t,text:p[Math.floor(Math.random()*p.length)],done:false,stage:S.stage};save()}
+  if(hasAI()&&!S.retoPick.ai&&!S.retoPick.done)setTimeout(autoReto,50);
   return S.retoPick}
 
 /* ================= Vistas ================= */
@@ -353,7 +421,9 @@ function render(){
   document.title=S.settings.discreet?'Notas':'Lumi';
   renderNav();hydrate();
   if(view==='ia')setTimeout(()=>window.scrollTo(0,document.body.scrollHeight),30);
-  const fab=$('#fab');if(S.settings.botUrl){fab.href=S.settings.botUrl;fab.style.display='grid'}else fab.style.display='none';
+  const fab=$('#fab');
+  if(hasAI()){fab.removeAttribute('href');fab.dataset.act='go';fab.dataset.v='ia';fab.textContent='✨';fab.style.display=view==='ia'?'none':'grid'}
+  else if(S.settings.botUrl){delete fab.dataset.act;fab.href=S.settings.botUrl;fab.textContent='💬';fab.style.display='grid'}else fab.style.display='none';
 }
 
 function vHoy(){
@@ -493,12 +563,15 @@ function vChat(){
   return head('Chatbot','Tu asistente','mas')+`<a class="btn ghost block" style="text-align:center;text-decoration:none;margin-bottom:12px" href="${esc(u)}" target="_blank" rel="noopener noreferrer">↗ Abrir en otra pestaña</a>
 `;
 }
+const QUICK=['¿Qué hago hoy?','Cámbiame el reto de hoy','Créame una rutina de noche para la piel','Apunta mis medidas','Hazme un plan de entreno nuevo','Ejercicio de voz para hoy'];
 function vIA(){
   let h=head('Valeria ✨','Tu asistente con IA','mas');
-  if(!hasAI())return h+`<div class="card"><p style="margin-top:0">Para usar el chat con IA necesitas poner tu clave de OpenRouter.</p><button class="btn block" data-act="go" data-v="ajustes">Ir a Ajustes</button></div>`;
+  if(!hasAI())return h+`<div class="card"><p style="margin-top:0">Para usar a Valeria necesitas poner tu clave de OpenRouter.</p><button class="btn block" data-act="go" data-v="ajustes">Ir a Ajustes</button></div>`;
   const ms=S.aiChat||[];
-  h+=`<div class="card">${ms.length?ms.map(m=>`<div class="msg ${m.role==='user'?'u':'a'}">${esc(m.content)}</div>`).join(''):`<div class="msg a">¡Hola${S.settings.name?', '+esc(S.settings.name):''}! 💕 Pregúntame lo que quieras: tallas, maquillaje, piel, voz, ropa para tu cuerpo… ¿Por dónde empezamos?</div>`}${aiBusy?'<div class="msg a t">Escribiendo…</div>':''}</div>
-  <div class="row" style="align-items:flex-end"><textarea id="aiIn" style="min-height:52px;height:52px" placeholder="Escribe tu pregunta…"></textarea><button class="btn" data-act="aiSend" ${aiBusy?'disabled':''}>➤</button></div>
+  h+=`<div class="row" style="justify-content:flex-end;margin:-8px 0 10px"><button class="btn sm ${S.settings.tts?'':'soft'}" data-act="tts">${S.settings.tts?'🔊 Voz activada':'🔇 Voz apagada'}</button></div>`;
+  h+=`<div class="card">${ms.length?ms.map(m=>`<div class="msg ${m.role==='user'?'u':'a'}">${esc(m.content)}${m.acts&&m.acts.length?`<div style="margin-top:8px">${m.acts.map(x=>`<span class="tag l" style="margin:2px 4px 0 0">✓ ${esc(x)}</span>`).join('')}</div>`:''}</div>`).join(''):`<div class="msg a">¡Hola${S.settings.name?', '+esc(S.settings.name):''}! 💕 Soy Valeria. Pregúntame lo que quieras o pídeme cosas: apunto tus medidas, te creo rutinas, cambio tu reto, te hago un plan de entreno… Yo me encargo.</div>`}${aiBusy?'<div class="msg a t">Pensando…</div>':''}</div>
+  ${aiBusy?'':`<div class="chips">${QUICK.map(q=>`<button class="chip" data-act="aiQuick" data-q="${esc(q)}">${esc(q)}</button>`).join('')}</div>`}
+  <div class="row" style="align-items:flex-end"><textarea id="aiIn" style="min-height:52px;height:52px" placeholder="Pídeme lo que quieras…"></textarea><button class="btn" data-act="aiSend" ${aiBusy?'disabled':''}>➤</button></div>
   ${ms.length?'<button class="btn sm soft" style="margin-top:12px" data-act="aiClear">Borrar conversación</button>':''}`;
   return h;
 }
@@ -616,10 +689,14 @@ const ACT={
       const txt=t.split('\n').map(x=>x.trim()).filter(Boolean)[0]||'';if(!txt)throw new Error('La IA no ha respondido, prueba otra vez');
       S.retoPick={date:ymd(),text:txt.replace(/^["“'*\-\s]+|["”'*\s]+$/g,''),done:false,stage:S.stage,ai:true};save();render()}
     catch(e){toast(e.message||'No se pudo conectar');render()}},
-  aiSend:async()=>{const q=fv('aiIn');if(!q||aiBusy)return;S.aiChat=S.aiChat||[];S.aiChat.push({role:'user',content:q});aiBusy=true;save();render();
-    try{const t=await ai([{role:'system',content:AI_SYS+'\n\n'+aiCtx()},...S.aiChat.slice(-20)],900,.8);S.aiChat.push({role:'assistant',content:t||'(sin respuesta, prueba otra vez)'})}
+  aiSend:async(el,ev,preset)=>{const q=preset||fv('aiIn');if(!q||aiBusy)return;S.aiChat=S.aiChat||[];S.aiChat.push({role:'user',content:q});aiBusy=true;save();render();
+    try{const raw=await ai([{role:'system',content:AI_SYS+'\n\n'+ACT_SYS+'\n\n'+aiCtx()},...S.aiChat.slice(-20).map(m=>({role:m.role,content:m.content}))],1500,.7);
+      const {text,acts}=splitActs(raw||'');const done=runActs(acts);
+      S.aiChat.push({role:'assistant',content:text||(done.length?'¡Hecho!':'(sin respuesta, prueba otra vez)'),acts:done});speak(text)}
     catch(e){S.aiChat.push({role:'assistant',content:'⚠️ '+(e.message||'No se pudo conectar')})}
     S.aiChat=S.aiChat.slice(-40);aiBusy=false;save();if(view==='ia')render()},
+  aiQuick:el=>ACT.aiSend(el,null,el.dataset.q),
+  tts:()=>{S.settings.tts=!S.settings.tts;save();if(!S.settings.tts&&window.speechSynthesis)speechSynthesis.cancel();else speak('Voz activada');render()},
   aiClear:()=>{if(!confirm('¿Borrar la conversación?'))return;S.aiChat=[];save();render()},
   saveAI:async el=>{const k=fv('aiKey');if(!k)return toast('Pega tu clave');S.settings.aiKey=k;S.settings.aiModel=fv('aiModel');S.aiTip=null;save();el.textContent='Probando…';el.disabled=true;
     try{const t=await ai([{role:'user',content:'Responde solo con la palabra: OK'}],20,0);toast(t?'¡Conectada y respondiendo! ✨':'Clave válida ✓ (el modelo no respondió, prueba en el chat)')}catch(e){toast('⚠️ '+e.message)}render()},
@@ -628,7 +705,7 @@ const ACT={
   exDone:el=>{const t=ymd();S.planLog=S.planLog||{};const a=S.planLog[t]||(S.planLog[t]=[]),k=exKey(eday,+el.dataset.i),x=a.indexOf(k);x<0?a.push(k):a.splice(x,1);
     const D=plan().days[eday];if(D.ex.every((e,i)=>a.includes(exKey(eday,i)))){const r=(S.routines.find(r=>/glúteo|entreno/i.test(r.name)&&r.freq!=='semanal')||S.routines.find(r=>/ejercicio/i.test(r.name)&&!/voz/i.test(r.name)&&r.freq!=='semanal'));if(r){const c=S.checks[t]||(S.checks[t]=[]);if(!c.includes(r.id))c.push(r.id)}toast('¡Día completado! 💪')}
     save();render()},
-  planReset:()=>{if(!confirm('¿Volver al plan básico? Se borrará el plan de la IA.'))return;S.plan=null;eday=0;if(S.planLog)S.planLog[ymd()]=[];save();render()},
+  planReset:()=>{if(!confirm('¿Volver al plan básico? Se borrará el plan de la IA.'))return;S.plan=null;S.planManual=true;eday=0;if(S.planLog)S.planLog[ymd()]=[];save();render()},
   planAI:()=>{sheet(`<h3>Plan a tu medida ✨</h3>
     <label class="f">Días por semana</label><select id="pDays"><option>2</option><option selected>3</option><option>4</option><option>5</option></select>
     <label class="f">Dónde entrenas</label><select id="pWhere"><option>En casa sin material</option><option>En casa con gomas o mancuernas</option><option>En el gimnasio</option></select>
@@ -637,14 +714,10 @@ const ACT={
     <label class="f">Algo más (opcional)</label><input id="pNote" placeholder="Ej: tengo poco tiempo, me molesta la rodilla…">
     <div class="actions"><button class="btn soft" data-act="close">Cancelar</button><button class="btn" data-act="planGo">Crear plan</button></div>`)},
   pGoal:el=>el.classList.toggle('on'),
-  planGo:async el=>{if(el.disabled)return;const goals=[...document.querySelectorAll('#pGoals .on')].map(b=>b.textContent).join(', ')||'cuerpo femenino en general';
-    const q=`Crea un plan de entrenamiento para feminizar la silueta: ${fv('pDays')} días por semana, ${fv('pWhere').toLowerCase()}, nivel ${fv('pLvl').toLowerCase()}. Objetivos: ${goals}. ${fv('pNote')?'Notas: '+fv('pNote')+'.':''}
-Prioriza glúteos y caderas, cintura estrecha (evita trabajo pesado de oblicuos y de espalda ancha), postura y flexibilidad. 4 a 6 ejercicios por día. Responde SOLO con JSON válido, sin texto antes ni después, con este formato exacto:
-{"title":"nombre corto del plan","note":"un consejo general breve","days":[{"name":"enfoque del día","ex":[{"n":"nombre del ejercicio","s":3,"r":"12 o 30 s","t":"consejo de técnica breve"}]}]}`;
-    el.disabled=true;el.textContent='Creando…';
-    try{const t=await ai([{role:'system',content:'Eres una entrenadora personal experta en entrenamiento para mujeres trans y personas que feminizan su cuerpo. Respondes en español de España y solo con JSON válido cuando se te pide.'},{role:'user',content:q}],3000,.7);
-      const p=parsePlan(t);if(!p)throw new Error('La IA no ha devuelto un plan válido, prueba otra vez');
-      S.plan=p;eday=0;if(S.planLog)S.planLog[ymd()]=[];save();closeSheet();go('entreno');toast('¡Plan nuevo listo! 💪')}
+  planGo:async el=>{if(el.disabled)return;
+    const pr={days:fv('pDays'),where:fv('pWhere'),lvl:fv('pLvl'),goals:[...document.querySelectorAll('#pGoals .on')].map(b=>b.textContent).join(', ')||'cuerpo femenino en general',note:fv('pNote')};
+    S.planPrefs=pr;save();el.disabled=true;el.textContent='Creando…';
+    try{await genPlan(pr);closeSheet();go('entreno');toast('¡Plan nuevo listo! 💪')}
     catch(e){toast(e.message||'No se pudo conectar');el.disabled=false;el.textContent='Crear plan'}},
   setTheme:el=>{S.settings.theme=el.dataset.t;save();render()},
   sugName:el=>{const box=document.getElementById(el.dataset.box);const pick=[...NAMES].sort(()=>Math.random()-.5).slice(0,8);
@@ -773,6 +846,7 @@ $('#importFile').addEventListener('change',async e=>{const f=e.target.files[0];e
     const k=S.settings.aiKey;S=Object.assign(JSON.parse(JSON.stringify(DEF)),d.state);if(!S.settings.aiKey)S.settings.aiKey=k;save();render();toast('Copia restaurada ✓')}catch(err){toast('Ese archivo no es una copia válida')}});
 
 document.addEventListener('click',e=>{const el=e.target.closest('[data-act]');if(!el)return;const f=ACT[el.dataset.act];if(f){e.preventDefault();f(el,e)}});
+document.addEventListener('keydown',e=>{if(e.target.id==='aiIn'&&e.key==='Enter'&&!e.shiftKey){e.preventDefault();ACT.aiSend()}});
 document.addEventListener('change',e=>{if(e.target.dataset.chg==='name'){S.settings.name=e.target.value.trim();save();toast('Guardado ✓')}});
 
 function stageOpts(act){return STAGES.slice(1).map((s,i)=>`<button class="chk ${S.stage===i+1?'sel':''}" data-act="${act}" data-s="${i+1}"><span class="ic">${s.e}</span><span class="tx"><b>${s.n}</b><small>${s.d}</small></span></button>`).join('')}
